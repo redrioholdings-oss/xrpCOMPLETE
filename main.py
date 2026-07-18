@@ -5,6 +5,14 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V103 changes:
+  1. XRP Rx blog button (xrprx.com) added under the feeds-scanned line —
+     light blue, lab-flask icon, 130x55 (half the 110px satellite icon height)
+  2. XRP Global Liquidity Tracker section added directly under the Live Chart:
+     global 24h volume, market cap, turnover ratio, and liquidity rating,
+     computed from existing CoinPaprika data (no new API dependencies).
+     Data layer refreshes every 60s (exceeds the 5-minute requirement).
+
 V102 changes (rebrand only — zero functional changes):
   1. Site name, titles, headers, footer, About page: XRP Complete → XRP Complete
   2. Domain references → xrpcomplete.com (single domain)
@@ -44,7 +52,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "102"
+APP_VERSION = "103"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -3209,6 +3217,22 @@ def render_page():
     sb_low = f'${MARKET["l24"]:.4f}' if MARKET.get("l24") else "\u2014"
     sb_feeds = f'{NEWS["feeds_active"]}/{NEWS["feeds_total"]}'
 
+    # Global Liquidity Tracker (V103) — computed from existing CoinPaprika data, no new calls
+    liq_vol  = _fmt_usd(MARKET.get("vol24"))
+    liq_mcap = _fmt_usd(MARKET.get("mcap"))
+    _v, _m = MARKET.get("vol24"), MARKET.get("mcap")
+    if _v and _m:
+        _t = (_v / _m) * 100.0
+        liq_turn = f"{_t:.2f}%"
+        # Rating bands: major-asset daily turnover context — <2% thin, 2-5% moderate,
+        # 5-12% healthy, >12% very deep
+        if _t >= 12:   liq_rating, liq_color, liq_pct = "VERY DEEP", "var(--gr)", 100
+        elif _t >= 5:  liq_rating, liq_color, liq_pct = "HEALTHY",   "var(--gr)", 78
+        elif _t >= 2:  liq_rating, liq_color, liq_pct = "MODERATE",  "var(--yl)", 50
+        else:          liq_rating, liq_color, liq_pct = "THIN",      "var(--rd)", 22
+    else:
+        liq_turn, liq_rating, liq_color, liq_pct = "\u2014", "\u2014", "var(--tx)", 0
+
     # On-Chain / Market Vitals — rebuilt to use reliably-populated MARKET data (V95)
     oc_mcap = _fmt_usd(MARKET.get("mcap"))
     oc_rank = f'Rank #{MARKET["rank"]}' if MARKET.get("rank") else "Rank \u2014"
@@ -4283,6 +4307,9 @@ def render_page():
           <span style="font-size:12px;color:var(--tx);margin-left:8px;letter-spacing:0.5px">v{APP_VERSION}</span>
         </div>
         <div class="sub" style="font-size:15px;color:var(--gr);letter-spacing:1px">\u25CF {hdr_feeds_active}/{hdr_feeds_total} feeds scanned</div>
+        <a href="https://xrprx.com" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;width:130px;height:55px;background:linear-gradient(135deg,#5aa9e6,#8cc9ff);color:#00253f;border-radius:10px;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:0.5px;box-shadow:0 0 12px rgba(117,188,255,.35)">
+          <span style="font-size:24px">\U0001F9EA</span> BLOG
+        </a>
       </div>
     </div>
 
@@ -4388,6 +4415,45 @@ def render_page():
           {{"autosize":true,"symbol":"BITSTAMP:XRPUSD","interval":"60","timezone":"Etc/UTC","theme":"dark","style":"1","locale":"en","backgroundColor":"#000000","gridColor":"#0a0a0a","hide_top_toolbar":false,"allow_symbol_change":false,"save_image":false,"support_host":"https://www.tradingview.com"}}
           </script>
         </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4b: XRP GLOBAL LIQUIDITY TRACKER (V103) -->
+    <div class="acct" style="padding:12px;border-color:rgba(117,188,255,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--bl)"><span class="sic">\U0001F4A7</span> XRP Global Liquidity Tracker</div>
+      <div style="font-size:15px;color:var(--tx);line-height:1.55;margin:6px 2px 12px 2px">
+        Liquidity measures how easily XRP can be bought or sold worldwide without moving its price.
+        Deep liquidity means large orders execute smoothly with tight spreads; thin liquidity means
+        even modest trades can swing the market. The strongest single indicator is global trading
+        volume relative to market capitalization &mdash; the turnover ratio &mdash; which shows how much of
+        the total supply changes hands each day across all exchanges combined.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div style="background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:10px 12px">
+          <div style="font-size:12px;color:var(--tx);letter-spacing:1px">GLOBAL 24H VOLUME</div>
+          <div style="font-size:22px;font-weight:900;color:var(--bl);font-family:var(--mn)">{liq_vol}</div>
+          <div style="font-size:12px;color:var(--tx)">all exchanges, aggregated</div>
+        </div>
+        <div style="background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:10px 12px">
+          <div style="font-size:12px;color:var(--tx);letter-spacing:1px">MARKET CAP</div>
+          <div style="font-size:22px;font-weight:900;color:var(--tq);font-family:var(--mn)">{liq_mcap}</div>
+          <div style="font-size:12px;color:var(--tx)">circulating value</div>
+        </div>
+        <div style="background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:10px 12px">
+          <div style="font-size:12px;color:var(--tx);letter-spacing:1px">TURNOVER RATIO</div>
+          <div style="font-size:22px;font-weight:900;color:var(--yl);font-family:var(--mn)">{liq_turn}</div>
+          <div style="font-size:12px;color:var(--tx)">24h volume &divide; market cap</div>
+        </div>
+        <div style="background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:10px 12px">
+          <div style="font-size:12px;color:var(--tx);letter-spacing:1px">LIQUIDITY READ</div>
+          <div style="font-size:22px;font-weight:900;color:{liq_color};font-family:var(--mn)">{liq_rating}</div>
+          <div style="height:6px;border-radius:3px;background:var(--b);margin-top:6px;overflow:hidden">
+            <div style="height:100%;width:{liq_pct}%;background:{liq_color}"></div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--tx);margin-top:8px;letter-spacing:0.5px">
+        \U0001F4A7 Global aggregate read (not single-exchange) &bull; source: CoinPaprika &bull; refreshes automatically every 5 minutes
       </div>
     </div>
 
