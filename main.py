@@ -5,6 +5,11 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V106 changes:
+  1. Blog button doubled in size: font-size 13px->26px, padding 3px/10px->
+     6px/20px, icon 15px->30px, border 1px->2px. Hollow outline style from
+     V105 preserved (transparent bg, var(--hdr) text/border).
+
 V105 changes:
   1. Blog button changed from filled gradient slab to hollow outline style,
      matching the ABOUT US button exactly (transparent bg, var(--hdr) text
@@ -62,7 +67,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "105"
+APP_VERSION = "106"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -4317,8 +4322,8 @@ def render_page():
           <span style="font-size:12px;color:var(--tx);margin-left:8px;letter-spacing:0.5px">v{APP_VERSION}</span>
         </div>
         <div class="sub" style="font-size:15px;color:var(--gr);letter-spacing:1px">\u25CF {hdr_feeds_active}/{hdr_feeds_total} feeds scanned</div>
-        <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;color:var(--hdr);font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--hdr);padding:3px 10px;border-radius:5px;letter-spacing:0.5px">
-          <span style="font-size:15px">\U0001F9EA</span>BLOG
+        <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:12px;color:var(--hdr);font-size:26px;font-weight:700;text-decoration:none;border:2px solid var(--hdr);padding:6px 20px;border-radius:10px;letter-spacing:1px">
+          <span style="font-size:30px">\U0001F9EA</span>BLOG
         </a>
       </div>
     </div>
