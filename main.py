@@ -5,8 +5,18 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V105 changes:
+  1. Blog button changed from filled gradient slab to hollow outline style,
+     matching the ABOUT US button exactly (transparent bg, var(--hdr) text
+     and border, same padding/radius/font-weight). Still links to
+     xrpcompleteblog.com.
+
+V104 changes:
+  1. Blog button now links to xrpcompleteblog.com (XRP Rx brand retired
+     before launch; XRPRadar and XRP Rx are both dead brands)
+
 V103 changes:
-  1. XRP Rx blog button (xrprx.com) added under the feeds-scanned line —
+  1. Blog button (originally xrprx.com) added under the feeds-scanned line —
      light blue, lab-flask icon, 130x55 (half the 110px satellite icon height)
   2. XRP Global Liquidity Tracker section added directly under the Live Chart:
      global 24h volume, market cap, turnover ratio, and liquidity rating,
@@ -52,7 +62,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "103"
+APP_VERSION = "105"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -4307,8 +4317,8 @@ def render_page():
           <span style="font-size:12px;color:var(--tx);margin-left:8px;letter-spacing:0.5px">v{APP_VERSION}</span>
         </div>
         <div class="sub" style="font-size:15px;color:var(--gr);letter-spacing:1px">\u25CF {hdr_feeds_active}/{hdr_feeds_total} feeds scanned</div>
-        <a href="https://xrprx.com" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;width:130px;height:55px;background:linear-gradient(135deg,#5aa9e6,#8cc9ff);color:#00253f;border-radius:10px;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:0.5px;box-shadow:0 0 12px rgba(117,188,255,.35)">
-          <span style="font-size:24px">\U0001F9EA</span> BLOG
+        <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;color:var(--hdr);font-size:13px;font-weight:700;text-decoration:none;border:1px solid var(--hdr);padding:3px 10px;border-radius:5px;letter-spacing:0.5px">
+          <span style="font-size:15px">\U0001F9EA</span>BLOG
         </a>
       </div>
     </div>
