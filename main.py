@@ -5,6 +5,33 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V107 changes:
+  1. Permanent cross-platform flag fix: all 132 flag-emoji instances (36
+     distinct countries/regions) now render via inline SVG through a single
+     centralized post-processor (replace_flags_with_svg), applied once to
+     the final page output. Fixes flags showing as raw two-letter codes on
+     Windows (Segoe UI Emoji has never shipped flag glyphs) on every
+     browser, permanently — no font/OS dependency remains.
+  2. Mainstream Integration icon: replaced Carpentry Saw (Unicode 13.0,
+     2020 — unsupported on older Windows installs, rendered as a blank
+     box) with Hammer and Wrench, already used 40x elsewhere on this page.
+  3. US Intelligence icon: automatically fixed by item 1 (it was the US
+     flag emoji).
+  4. Fixed a real color-duplication bug in XRP Complete Exclusive
+     Intelligence: "Partnership Momentum" was hardcoded to the same yellow
+     as "Institutional Confidence Index"; changed to blue for a distinct
+     4-color set matching Catalyst Clock (orange) and Narrative Diffusion
+     Map (turquoise).
+  5. Darkened the shared card-surface background (--s1, 0a0a0a -> 050505)
+     used by the top 3-box status row and every .acct panel (RSI Signals,
+     Support & Resistance, etc.) per direct user markup.
+  6. Responsive layout: added a phone-width breakpoint for the previously
+     uncovered 3-box status row, plus a comprehensive small-phone safety
+     net (480px and 360px breakpoints) catching any remaining
+     multi-column grids, table overflow, and spacing on narrow screens —
+     layered on top of the 19 section-specific breakpoints already
+     present (900px/700px), which were left untouched.
+
 V106 changes:
   1. Blog button doubled in size: font-size 13px->26px, padding 3px/10px->
      6px/20px, icon 15px->30px, border 1px->2px. Hollow outline style from
@@ -67,7 +94,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "106"
+APP_VERSION = "107"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -3074,6 +3101,82 @@ def iso20022_html():
     return out
 
 
+# ----------------------------------------------------------------------
+# FLAG_SVG (V107) \u2014 permanent replacement for Unicode flag emoji.
+# Windows has never shipped flag glyphs in its system emoji font, so flag
+# emoji fall back to showing the raw two-letter country code as text on
+# every browser on Windows. These small inline SVGs render identically on
+# every OS, browser, and version \u2014 no font dependency at all.
+# Simplified but accurate to each flag's real colors and stripe/layout.
+# ----------------------------------------------------------------------
+FLAG_SVG = {
+"US": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#B22234"/><rect y="1.08" width="20" height="1.08" fill="#fff"/><rect y="3.23" width="20" height="1.08" fill="#fff"/><rect y="5.38" width="20" height="1.08" fill="#fff"/><rect y="7.54" width="20" height="1.08" fill="#fff"/><rect y="9.69" width="20" height="1.08" fill="#fff"/><rect y="11.85" width="20" height="1.08" fill="#fff"/><rect width="8" height="7.54" fill="#3C3B6E"/></svg>',
+"GB": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L20 14M20 0L0 14" stroke="#fff" stroke-width="2.2"/><path d="M0 0L20 14M20 0L0 14" stroke="#cf142b" stroke-width="0.9"/><path d="M10 0V14M0 7H20" stroke="#fff" stroke-width="3.6"/><path d="M10 0V14M0 7H20" stroke="#cf142b" stroke-width="2"/></svg>',
+"AU": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L6 4.5M6 0L0 4.5" stroke="#fff" stroke-width="0.9"/><path d="M0 0V7H10V0Z" fill="#00247d" stroke="#fff" stroke-width="0.4"/><g fill="#fff"><circle cx="15" cy="4" r="0.8"/><circle cx="17" cy="7" r="0.8"/><circle cx="15" cy="10" r="0.8"/><circle cx="12" cy="8" r="0.6"/><circle cx="12" cy="4" r="0.6"/></g></svg>',
+"CH": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#d52b1e"/><rect x="8.5" y="4" width="3" height="6" fill="#fff"/><rect x="6.5" y="6" width="7" height="2" fill="#fff"/></svg>',
+"SG": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#ed2939"/><rect y="7" width="20" height="7" fill="#fff"/><circle cx="5" cy="3.5" r="2" fill="#fff"/><circle cx="6" cy="3.5" r="1.7" fill="#ed2939"/></svg>',
+"BR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#009c3b"/><polygon points="10,2 18,7 10,12 2,7" fill="#ffdf00"/><circle cx="10" cy="7" r="2.6" fill="#002776"/></svg>',
+"AE": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" y="0" fill="#00732f"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><rect width="5" height="14" fill="#ff0000"/></svg>',
+"KR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3" fill="#c60c30"/><path d="M10 4A1.5 1.5 0 0 1 10 7A1.5 1.5 0 0 0 10 10A3 3 0 0 0 10 4" fill="#003478"/></svg>',
+"PH": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#0038a8"/><rect y="7" width="20" height="7" fill="#ce1126"/><polygon points="0,0 7,7 0,14" fill="#fff"/><circle cx="2.3" cy="7" r="1" fill="#fcd116"/></svg>',
+"IN": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#ff9933"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#138808"/><circle cx="10" cy="7" r="1.3" fill="none" stroke="#000080" stroke-width="0.25"/></svg>',
+"CA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><rect width="5" height="14" fill="#ff0000"/><rect x="15" width="5" height="14" fill="#ff0000"/><path d="M10 3l1 2.2 2-1-0.6 2.3 2.1-0.2-1.6 1.7 1.6 1.7-2.1-0.2 0.6 2.3-2-1-1 2.2-1-2.2-2 1 0.6-2.3-2.1 0.2 1.6-1.7-1.6-1.7 2.1 0.2-0.6-2.3 2 1z" fill="#ff0000"/></svg>',
+"DE": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#000"/><rect width="20" height="4.67" y="4.67" fill="#dd0000"/><rect width="20" height="4.67" y="9.33" fill="#ffce00"/></svg>',
+"MY": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><g fill="#cc0001"><rect y="0" width="20" height="1"/><rect y="2" width="20" height="1"/><rect y="4" width="20" height="1"/><rect y="6" width="20" height="1"/><rect y="8" width="20" height="1"/><rect y="10" width="20" height="1"/><rect y="12" width="20" height="1"/></g><rect width="10" height="7.5" fill="#010066"/><circle cx="4" cy="3.5" r="2" fill="#ffcc00"/><circle cx="4.9" cy="3.5" r="1.7" fill="#010066"/></svg>',
+"ES": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg>',
+"EU": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#003399"/><g fill="#ffcc00"><circle cx="10" cy="2.6" r="0.5"/><circle cx="10" cy="11.4" r="0.5"/><circle cx="5.6" cy="7" r="0.5"/><circle cx="14.4" cy="7" r="0.5"/><circle cx="6.9" cy="3.9" r="0.5"/><circle cx="13.1" cy="3.9" r="0.5"/><circle cx="6.9" cy="10.1" r="0.5"/><circle cx="13.1" cy="10.1" r="0.5"/></g></svg>',
+"JP": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3.4" fill="#bc002d"/></svg>',
+"TH": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#f4f5f8"/><rect width="20" height="2.8" fill="#a51931"/><rect y="11.2" width="20" height="2.8" fill="#a51931"/><rect y="4.67" width="20" height="4.67" fill="#2d2a4a"/></svg>',
+"PK": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#01411c"/><rect width="5" height="14" fill="#fff"/><circle cx="13" cy="7" r="2.6" fill="#fff"/><circle cx="14" cy="7" r="2.2" fill="#01411c"/></svg>',
+"PE": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#d91023"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#d91023"/></svg>',
+"MX": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#006847"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce1126"/><circle cx="10" cy="7" r="1.3" fill="#8b5a2b"/></svg>',
+"QA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#8d1b3d"/><rect width="6" height="14" fill="#fff"/><polygon points="6,0 8,1.75 6,3.5" fill="#fff"/><polygon points="6,3.5 8,5.25 6,7" fill="#fff"/><polygon points="6,7 8,8.75 6,10.5" fill="#fff"/><polygon points="6,10.5 8,12.25 6,14" fill="#fff"/></svg>',
+"TR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#e30a17"/><circle cx="8.5" cy="7" r="3" fill="#fff"/><circle cx="9.3" cy="7" r="2.5" fill="#e30a17"/></svg>',
+"NL": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#ae1c28"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#21468b"/></svg>',
+"IT": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#009246"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce2b37"/></svg>',
+"SE": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006aa7"/><rect x="6" width="2.2" height="14" fill="#fecc00"/><rect y="5.9" width="20" height="2.2" fill="#fecc00"/></svg>',
+"BD": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006a4e"/><circle cx="9" cy="7" r="3.2" fill="#f42a41"/></svg>',
+"KW": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#007a3d"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><polygon points="0,0 5,7 0,14" fill="#ce1126"/></svg>',
+"SA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006c35"/><rect x="3" y="6.3" width="14" height="1.4" fill="#fff"/></svg>',
+"VN": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#da251d"/><polygon points="10,3.5 11.2,6.7 14.5,6.7 11.8,8.7 12.8,12 10,10 7.2,12 8.2,8.7 5.5,6.7 8.8,6.7" fill="#ffff00"/></svg>',
+"BT": '<svg viewBox="0 0 20 14"><polygon points="0,0 20,0 0,14" fill="#ffcc00"/><polygon points="20,0 20,14 0,14" fill="#ff4e12"/></svg>',
+"ME": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#c40308"/><rect x="1" y="1" width="18" height="12" fill="none" stroke="#d4af37" stroke-width="1"/><circle cx="10" cy="7" r="2.6" fill="#d4af37"/></svg>',
+"PW": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#4aadd6"/><circle cx="8.5" cy="7" r="3.4" fill="#ffde00"/></svg>',
+"CO": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#fcd116"/><rect width="20" height="3.5" y="7" fill="#003893"/><rect width="20" height="3.5" y="10.5" fill="#ce1126"/></svg>',
+"HK": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#de2910"/><circle cx="10" cy="7" r="3.6" fill="#fff"/></svg>',
+"FR": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#0055A4"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#EF4135"/></svg>',
+"ZA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><rect width="20" height="4.67" fill="#000c8a"/><rect width="20" height="4.67" y="9.33" fill="#de3831"/><polygon points="0,4.67 8,7 0,9.33" fill="#007847"/><polygon points="0,5.4 6,7 0,8.6" fill="#ffb612"/></svg>',
+}
+_FLAG_FALLBACK = '<svg viewBox="0 0 20 14"><rect width="20" height="14" rx="1.5" fill="#3a4a63"/><circle cx="10" cy="7" r="4" fill="none" stroke="#a8bdd0" stroke-width="0.8"/></svg>'
+
+
+def _region_indicator_to_code(pair):
+    """Decode a 2-char regional-indicator flag emoji (e.g. US flag) to its ISO code."""
+    try:
+        return ''.join(chr(ord(ch) - 0x1F1E6 + ord('A')) for ch in pair)
+    except Exception:
+        return None
+
+
+_FLAG_EMOJI_RE = re.compile(
+    '[' + '\U0001F1E6-\U0001F1FF' + ']{2}'
+)
+
+
+def replace_flags_with_svg(html_text):
+    """Post-process any fully-rendered HTML page and replace every flag emoji
+    (wherever it came from \u2014 partner directory, region lookups, FX table,
+    anywhere) with an inline SVG that renders identically on every OS and
+    browser. This is applied once, centrally, to the final page output, so
+    every flag on the site is covered regardless of which code path produced
+    it."""
+    def repl(m):
+        code = _region_indicator_to_code(m.group(0))
+        svg = FLAG_SVG.get(code, _FLAG_FALLBACK)
+        return f'<span class="flag-ic" style="display:inline-flex;vertical-align:-2px">{svg}</span>'
+    return _FLAG_EMOJI_RE.sub(repl, html_text)
+
+
 def render_page():
     checks, passed, total, overall = run_preflight()
     overall_color = "#48ff82" if overall == "PASS" else "#ff4060"
@@ -3532,7 +3635,7 @@ def render_page():
 <title>{APP_NAME} \u2014 {TAGLINE}</title>
 <style>
   :root{{
-    --bg:#000; --s1:#0a0a0a; --s2:#111; --b:#1a2030;
+    --bg:#000; --s1:#050505; --s2:#111; --b:#1a2030;
     --gr:#48ff82; --grd:rgba(72,255,130,.1);
     --rd:#ff4060; --rdd:rgba(255,64,96,.1);
     --yl:#ffcc00; --yld:rgba(255,204,0,.1);
@@ -3573,6 +3676,7 @@ def render_page():
 
   /* STATUS ROW — compact horizontal rectangles */
   .srow{{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }}
+  @media(max-width:700px){{ .srow{{ grid-template-columns:1fr; }} }}
   .si{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; }}
   .si-lbl{{ color:#ffffff; font-size:17px; font-family:var(--mn); font-weight:700; letter-spacing:.5px; display:flex; align-items:center; gap:9px; white-space:nowrap; }}
   .si-lbl .ic{{ font-size:22px; }}
@@ -4285,6 +4389,31 @@ def render_page():
   /* FLOATING RETURN / BACK-TO-TOP */
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
+
+  /* ============================================================
+     RESPONSIVE SAFETY NET (V107) \u2014 catch-all rules for phones and
+     small tablets, layered on top of the section-specific breakpoints
+     above. Placed last so it wins the cascade. Covers iPhone/Android
+     widths (~360-430px) that nothing above specifically targeted.
+     ============================================================ */
+  @media(max-width:480px){{
+    .w{{ padding:8px 12px; }}
+    main{{ padding:10px 12px 70px; }}
+    body{{ font-size:14px; }}
+    .hdr{{ padding-top:20px; padding-bottom:20px; gap:12px; }}
+    [class$="-grid"], [class$="-grid3"], .sb-grid4 {{
+      grid-template-columns: 1fr !important;
+    }}
+    .fx-grid{{ grid-template-columns:repeat(2,1fr) !important; }}
+    .sb-grid{{ grid-template-columns:repeat(2,1fr) !important; }}
+    .sb-grid4{{ grid-template-columns:1fr !important; }}
+    table{{ display:block; overflow-x:auto; white-space:nowrap; }}
+    .acct{{ padding:10px; }}
+  }}
+  @media(max-width:360px){{
+    .w{{ padding:6px 8px; }}
+    .sic{{ font-size:15px; }}
+  }}
 </style>
 </head>
 <body id="top">
@@ -4579,7 +4708,7 @@ def render_page():
 
     <!-- SECTION 7: MAINSTREAM INTEGRATION MONITOR (title + tagline + legend key) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
-      <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001FA9A</span> Mainstream Integration Monitor</div>
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0</span> Mainstream Integration Monitor</div>
       <div class="trk-tag">XRP is no longer knocking on the door of traditional finance \u2014 it's building new springboards for growth and utilization.</div>
       <div class="trk-legend">
         <button class="trk-btn active" data-filter="ALL" onclick="filterTracker('ALL',this)" style="color:#ffffff;border-color:rgba(255,255,255,.5)">ALL</button>
@@ -5359,7 +5488,7 @@ def render_page():
         site's API; it exists because XRP Complete has been watching and recording since deploy.
         <ul class="flagship-list">
           <li><b style="color:var(--yl)">Institutional Confidence Index</b> \u2014 one flagship score from five disclosed components.</li>
-          <li><b style="color:var(--yl)">Partnership Momentum</b> \u2014 deals-per-week velocity from our own ledger.</li>
+          <li><b style="color:var(--bl)">Partnership Momentum</b> \u2014 deals-per-week velocity from our own ledger.</li>
           <li><b style="color:var(--or)">Catalyst Clock</b> \u2014 when XRP-moving stories actually break, by hour and weekday.</li>
           <li><b style="color:var(--tq)">Narrative Diffusion Map</b> \u2014 how fast a theme spreads across regions.</li>
         </ul>
@@ -5863,7 +5992,7 @@ def render_page():
 # ─────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
-    return Response(render_page(), mimetype="text/html")
+    return Response(replace_flags_with_svg(render_page()), mimetype="text/html")
 
 
 @app.route("/about")
