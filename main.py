@@ -5,6 +5,24 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V109 changes:
+  1. Dollar Cost Averaging Calculator: weekly vs monthly contribution
+     comparison using real daily close prices (reuses the same Coinbase
+     candle fetch already powering RSI/52-week/etc, no new API call).
+     Client-side JS recalculates live as the user changes either amount.
+  2. 30-Day Historical Price Data table: Date, Day of Week, Open, High,
+     Low, Close, $ Change, % Change — newest first, real OHLC from the
+     same candle source.
+  3. News Mention Volume (for yesterday): real story counts across all
+     RSS feeds this site already tracks, broken down by category, with
+     total count and contributing-source count. Locks in at 00:15 UTC
+     daily. Built as an honest substitute for a literal "social media
+     post count" section, which was not built — no free/reliable API
+     exists for real cross-platform social post counts, and fabricating
+     that data would violate this site's own established principle of
+     never inventing figures (see SENTIMENT_HISTORY's existing comment:
+     "Builds up honestly over time -- no fabricated history").
+
 V108 changes:
   1. Correction: V107 darkened the shared card background (--s1) per an
      initial reading of user markup. Clarified request was the opposite —
@@ -103,7 +121,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "108"
+APP_VERSION = "109"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -118,7 +136,7 @@ MARKET = {
     "xrp_price": None, "xrp_chg": None,
     "fng": None, "fng_label": None,
     "mcap": None, "vol24": None, "rank": None, "h24": None, "l24": None, "xrpbtc": None,
-    "fng_history": [], "funding": None,
+    "fng_history": [], "funding": None, "hist_30d": [], "hist_full": [],
     "perf_1w": None, "perf_30d": None, "perf_90d": None, "perf_6m": None,
     "fx": {},
     "competitors": {},
@@ -243,6 +261,16 @@ def fetch_market():
             MARKET["perf_30d"] = _perf(30)
             MARKET["perf_90d"] = _perf(90)
             MARKET["perf_6m"]  = _perf(180)
+            # 30-Day Historical Price Data + full DCA history (V109) \u2014 reuses the
+            # k1d candles already fetched above for RSI/52-week/etc.; no new API call.
+            MARKET["hist_30d"] = [
+                {"t": int(c[0]), "o": float(c[3]), "h": float(c[2]),
+                 "l": float(c[1]), "c": float(c[4])}
+                for c in k1d[-30:]
+            ]
+            MARKET["hist_full"] = [
+                {"t": int(c[0]), "c": float(c[4])} for c in k1d
+            ]
             # Chaikin Accumulation/Distribution Line (pure price/volume TA indicator)
             ad = 0.0
             ad_series = []
@@ -1186,6 +1214,7 @@ def fetch_news():
     NEWS["feeds_active"] = active
     NEWS["updated"] = now.strftime("%Y-%m-%d %H:%M:%S UTC")
     _track_sentiment_history(pool)
+    _track_news_volume(pool)
     _detect_partnership_deals(pool)
     _track_catalyst_clock(pool)
     _track_narrative_diffusion(pool)
@@ -1481,6 +1510,11 @@ def partnership_ledger_html(limit=30):
 
 
 SENTIMENT_HISTORY = {}   # date_str -> {"bull","bear","neut","total","_keys"}
+NEWS_VOLUME_HISTORY = {}  # date_str -> {"total","sources":set,"by_cat":{},"_keys":set} \u2014 real,
+                          # honestly-accumulated daily counts from the feeds this site already
+                          # tracks. Never fabricated or estimated; builds up over time like
+                          # SENTIMENT_HISTORY above. Used by "News Mention Volume" (V109).
+NEWS_VOLUME_HISTORY_MAX = 30
 SENTIMENT_HISTORY_MAX = 30
 
 def tech_specs_html():
@@ -1702,6 +1736,29 @@ def partnership_momentum_html(weeks=10):
         trend, tcol = "\u2192 steady week over week", "var(--tx)"
     avg = round(total / weeks, 1) if total else 0.0
     return bars, total, this_week, trend, tcol, avg
+
+
+def _track_news_volume(pool):
+    """Real, honestly-accumulated daily news volume \u2014 same de-dup pattern as
+    _track_sentiment_history. No estimation, no fabrication: only counts
+    stories this site's own 306+ RSS feeds have actually returned."""
+    for s in pool:
+        try:
+            day = s["dt"].astimezone(timezone.utc).date().isoformat()
+        except Exception:
+            continue
+        bucket = NEWS_VOLUME_HISTORY.setdefault(
+            day, {"total": 0, "sources": set(), "by_cat": {}, "_keys": set()})
+        if s["key"] in bucket["_keys"]:
+            continue
+        bucket["_keys"].add(s["key"])
+        bucket["total"] += 1
+        bucket["sources"].add(s.get("source", "Unknown"))
+        cat = s.get("category", "General")
+        bucket["by_cat"][cat] = bucket["by_cat"].get(cat, 0) + 1
+    if len(NEWS_VOLUME_HISTORY) > NEWS_VOLUME_HISTORY_MAX:
+        for old_day in sorted(NEWS_VOLUME_HISTORY.keys())[:len(NEWS_VOLUME_HISTORY) - NEWS_VOLUME_HISTORY_MAX]:
+            del NEWS_VOLUME_HISTORY[old_day]
 
 
 def _track_sentiment_history(pool):
@@ -2338,6 +2395,81 @@ def _fng_color(v):
     if v <= 55: return "var(--yl)"
     if v <= 75: return "var(--gr)"
     return "var(--tq)"
+
+def news_mention_volume_html():
+    """News Mention Volume for 'yesterday' \u2014 real counts from the site's own
+    306+ RSS feeds, never estimated. Resets at 00:15 UTC (the 15-minute
+    buffer lets the last fetch cycle of the prior day land before the
+    figure locks in as final)."""
+    now = datetime.now(timezone.utc)
+    if now.hour == 0 and now.minute < 15:
+        target = (now - timedelta(days=2)).date()
+    else:
+        target = (now - timedelta(days=1)).date()
+    day_str = target.isoformat()
+    day_label = target.strftime("%A, %B %d")
+    bucket = NEWS_VOLUME_HISTORY.get(day_str)
+
+    if not bucket or bucket["total"] == 0:
+        return (
+            '<div class="home-base"><div class="home-base-icon">\U0001F4F0</div>'
+            '<div class="home-base-title">Building Today\'s Count</div>'
+            '<div class="home-base-sub">This tracker started counting from deploy \u2014 a full '
+            "day's honest figure will appear here once one complete day has passed. "
+            "Nothing here is ever estimated or backfilled.</div></div>", day_label, 0, 0, ""
+        )
+
+    total = bucket["total"]
+    contributors = len(bucket["sources"])
+    cats = sorted(bucket["by_cat"].items(), key=lambda kv: -kv[1])[:8]
+    max_cat = max((n for _, n in cats), default=1) or 1
+    cat_rows = "".join(
+        f'<div class="nmv-row"><span class="nmv-cat">{html.escape(cat)}</span>'
+        f'<div class="nmv-bar-track"><div class="nmv-bar-fill" style="width:{n / max_cat * 100:.0f}%"></div></div>'
+        f'<span class="nmv-n">{n}</span></div>'
+        for cat, n in cats
+    )
+    return cat_rows, day_label, total, contributors, day_str
+
+
+def historical_30d_html():
+    """30-Day Historical Price Data table \u2014 real daily OHLC from the same
+    Coinbase candles already powering RSI/52-week/etc. No new API, no
+    estimation."""
+    rows = MARKET.get("hist_30d") or []
+    if not rows:
+        return '<div class="home-base"><div class="home-base-icon">\U0001F4C5</div>' \
+               '<div class="home-base-title">Building History</div>' \
+               '<div class="home-base-sub">30 days of daily price history populates on deploy.</div></div>'
+    out = []
+    prev_close = None
+    for r in rows:
+        d = datetime.fromtimestamp(r["t"], tz=timezone.utc)
+        date_str = d.strftime("%b %d, %Y")
+        day_str = d.strftime("%A")
+        o, h, l, c = r["o"], r["h"], r["l"], r["c"]
+        if prev_close:
+            chg = c - prev_close
+            pct = (chg / prev_close * 100) if prev_close else 0
+            chg_col = "var(--gr)" if chg >= 0 else "var(--rd)"
+            chg_str = f'{"+" if chg >= 0 else ""}{chg:.4f}'
+            pct_str = f'{"+" if pct >= 0 else ""}{pct:.2f}%'
+        else:
+            chg_col, chg_str, pct_str = "var(--tx)", "\u2014", "\u2014"
+        out.append(
+            f'<tr><td>{date_str}</td><td>{day_str}</td>'
+            f'<td>${o:.4f}</td><td>${h:.4f}</td><td>${l:.4f}</td><td>${c:.4f}</td>'
+            f'<td style="color:{chg_col}">{chg_str}</td><td style="color:{chg_col}">{pct_str}</td></tr>'
+        )
+        prev_close = c
+    out.reverse()  # newest first for display
+    return (
+        '<table class="hist-table"><thead><tr>'
+        '<th>Date</th><th>Day</th><th>Open</th><th>High</th><th>Low</th><th>Close</th>'
+        '<th>$ Change</th><th>% Change</th></tr></thead><tbody>'
+        + "".join(out) + "</tbody></table>"
+    )
+
 
 def fng_history_html():
     hist = MARKET.get("fng_history") or []
@@ -3120,43 +3252,43 @@ def iso20022_html():
 # ----------------------------------------------------------------------
 FLAG_SVG = {
 "US": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#B22234"/><rect y="1.08" width="20" height="1.08" fill="#fff"/><rect y="3.23" width="20" height="1.08" fill="#fff"/><rect y="5.38" width="20" height="1.08" fill="#fff"/><rect y="7.54" width="20" height="1.08" fill="#fff"/><rect y="9.69" width="20" height="1.08" fill="#fff"/><rect y="11.85" width="20" height="1.08" fill="#fff"/><rect width="8" height="7.54" fill="#3C3B6E"/></svg>',
-"GB": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L20 14M20 0L0 14" stroke="#fff" stroke-width="2.2"/><path d="M0 0L20 14M20 0L0 14" stroke="#cf142b" stroke-width="0.9"/><path d="M10 0V14M0 7H20" stroke="#fff" stroke-width="3.6"/><path d="M10 0V14M0 7H20" stroke="#cf142b" stroke-width="2"/></svg>',
-"AU": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L6 4.5M6 0L0 4.5" stroke="#fff" stroke-width="0.9"/><path d="M0 0V7H10V0Z" fill="#00247d" stroke="#fff" stroke-width="0.4"/><g fill="#fff"><circle cx="15" cy="4" r="0.8"/><circle cx="17" cy="7" r="0.8"/><circle cx="15" cy="10" r="0.8"/><circle cx="12" cy="8" r="0.6"/><circle cx="12" cy="4" r="0.6"/></g></svg>',
-"CH": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#d52b1e"/><rect x="8.5" y="4" width="3" height="6" fill="#fff"/><rect x="6.5" y="6" width="7" height="2" fill="#fff"/></svg>',
-"SG": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#ed2939"/><rect y="7" width="20" height="7" fill="#fff"/><circle cx="5" cy="3.5" r="2" fill="#fff"/><circle cx="6" cy="3.5" r="1.7" fill="#ed2939"/></svg>',
-"BR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#009c3b"/><polygon points="10,2 18,7 10,12 2,7" fill="#ffdf00"/><circle cx="10" cy="7" r="2.6" fill="#002776"/></svg>',
-"AE": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" y="0" fill="#00732f"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><rect width="5" height="14" fill="#ff0000"/></svg>',
-"KR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3" fill="#c60c30"/><path d="M10 4A1.5 1.5 0 0 1 10 7A1.5 1.5 0 0 0 10 10A3 3 0 0 0 10 4" fill="#003478"/></svg>',
-"PH": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#0038a8"/><rect y="7" width="20" height="7" fill="#ce1126"/><polygon points="0,0 7,7 0,14" fill="#fff"/><circle cx="2.3" cy="7" r="1" fill="#fcd116"/></svg>',
-"IN": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#ff9933"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#138808"/><circle cx="10" cy="7" r="1.3" fill="none" stroke="#000080" stroke-width="0.25"/></svg>',
-"CA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><rect width="5" height="14" fill="#ff0000"/><rect x="15" width="5" height="14" fill="#ff0000"/><path d="M10 3l1 2.2 2-1-0.6 2.3 2.1-0.2-1.6 1.7 1.6 1.7-2.1-0.2 0.6 2.3-2-1-1 2.2-1-2.2-2 1 0.6-2.3-2.1 0.2 1.6-1.7-1.6-1.7 2.1 0.2-0.6-2.3 2 1z" fill="#ff0000"/></svg>',
-"DE": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#000"/><rect width="20" height="4.67" y="4.67" fill="#dd0000"/><rect width="20" height="4.67" y="9.33" fill="#ffce00"/></svg>',
-"MY": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><g fill="#cc0001"><rect y="0" width="20" height="1"/><rect y="2" width="20" height="1"/><rect y="4" width="20" height="1"/><rect y="6" width="20" height="1"/><rect y="8" width="20" height="1"/><rect y="10" width="20" height="1"/><rect y="12" width="20" height="1"/></g><rect width="10" height="7.5" fill="#010066"/><circle cx="4" cy="3.5" r="2" fill="#ffcc00"/><circle cx="4.9" cy="3.5" r="1.7" fill="#010066"/></svg>',
-"ES": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg>',
-"EU": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#003399"/><g fill="#ffcc00"><circle cx="10" cy="2.6" r="0.5"/><circle cx="10" cy="11.4" r="0.5"/><circle cx="5.6" cy="7" r="0.5"/><circle cx="14.4" cy="7" r="0.5"/><circle cx="6.9" cy="3.9" r="0.5"/><circle cx="13.1" cy="3.9" r="0.5"/><circle cx="6.9" cy="10.1" r="0.5"/><circle cx="13.1" cy="10.1" r="0.5"/></g></svg>',
-"JP": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3.4" fill="#bc002d"/></svg>',
-"TH": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#f4f5f8"/><rect width="20" height="2.8" fill="#a51931"/><rect y="11.2" width="20" height="2.8" fill="#a51931"/><rect y="4.67" width="20" height="4.67" fill="#2d2a4a"/></svg>',
-"PK": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#01411c"/><rect width="5" height="14" fill="#fff"/><circle cx="13" cy="7" r="2.6" fill="#fff"/><circle cx="14" cy="7" r="2.2" fill="#01411c"/></svg>',
-"PE": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#d91023"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#d91023"/></svg>',
-"MX": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#006847"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce1126"/><circle cx="10" cy="7" r="1.3" fill="#8b5a2b"/></svg>',
-"QA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#8d1b3d"/><rect width="6" height="14" fill="#fff"/><polygon points="6,0 8,1.75 6,3.5" fill="#fff"/><polygon points="6,3.5 8,5.25 6,7" fill="#fff"/><polygon points="6,7 8,8.75 6,10.5" fill="#fff"/><polygon points="6,10.5 8,12.25 6,14" fill="#fff"/></svg>',
-"TR": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#e30a17"/><circle cx="8.5" cy="7" r="3" fill="#fff"/><circle cx="9.3" cy="7" r="2.5" fill="#e30a17"/></svg>',
-"NL": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#ae1c28"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#21468b"/></svg>',
-"IT": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#009246"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce2b37"/></svg>',
-"SE": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006aa7"/><rect x="6" width="2.2" height="14" fill="#fecc00"/><rect y="5.9" width="20" height="2.2" fill="#fecc00"/></svg>',
-"BD": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006a4e"/><circle cx="9" cy="7" r="3.2" fill="#f42a41"/></svg>',
-"KW": '<svg viewBox="0 0 20 14"><rect width="20" height="4.67" fill="#007a3d"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><polygon points="0,0 5,7 0,14" fill="#ce1126"/></svg>',
-"SA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#006c35"/><rect x="3" y="6.3" width="14" height="1.4" fill="#fff"/></svg>',
-"VN": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#da251d"/><polygon points="10,3.5 11.2,6.7 14.5,6.7 11.8,8.7 12.8,12 10,10 7.2,12 8.2,8.7 5.5,6.7 8.8,6.7" fill="#ffff00"/></svg>',
-"BT": '<svg viewBox="0 0 20 14"><polygon points="0,0 20,0 0,14" fill="#ffcc00"/><polygon points="20,0 20,14 0,14" fill="#ff4e12"/></svg>',
-"ME": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#c40308"/><rect x="1" y="1" width="18" height="12" fill="none" stroke="#d4af37" stroke-width="1"/><circle cx="10" cy="7" r="2.6" fill="#d4af37"/></svg>',
-"PW": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#4aadd6"/><circle cx="8.5" cy="7" r="3.4" fill="#ffde00"/></svg>',
-"CO": '<svg viewBox="0 0 20 14"><rect width="20" height="7" fill="#fcd116"/><rect width="20" height="3.5" y="7" fill="#003893"/><rect width="20" height="3.5" y="10.5" fill="#ce1126"/></svg>',
-"HK": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#de2910"/><circle cx="10" cy="7" r="3.6" fill="#fff"/></svg>',
-"FR": '<svg viewBox="0 0 20 14"><rect width="6.67" height="14" fill="#0055A4"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#EF4135"/></svg>',
-"ZA": '<svg viewBox="0 0 20 14"><rect width="20" height="14" fill="#fff"/><rect width="20" height="4.67" fill="#000c8a"/><rect width="20" height="4.67" y="9.33" fill="#de3831"/><polygon points="0,4.67 8,7 0,9.33" fill="#007847"/><polygon points="0,5.4 6,7 0,8.6" fill="#ffb612"/></svg>',
+"GB": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L20 14M20 0L0 14" stroke="#fff" stroke-width="2.2"/><path d="M0 0L20 14M20 0L0 14" stroke="#cf142b" stroke-width="0.9"/><path d="M10 0V14M0 7H20" stroke="#fff" stroke-width="3.6"/><path d="M10 0V14M0 7H20" stroke="#cf142b" stroke-width="2"/></svg>',
+"AU": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#00247d"/><path d="M0 0L6 4.5M6 0L0 4.5" stroke="#fff" stroke-width="0.9"/><path d="M0 0V7H10V0Z" fill="#00247d" stroke="#fff" stroke-width="0.4"/><g fill="#fff"><circle cx="15" cy="4" r="0.8"/><circle cx="17" cy="7" r="0.8"/><circle cx="15" cy="10" r="0.8"/><circle cx="12" cy="8" r="0.6"/><circle cx="12" cy="4" r="0.6"/></g></svg>',
+"CH": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#d52b1e"/><rect x="8.5" y="4" width="3" height="6" fill="#fff"/><rect x="6.5" y="6" width="7" height="2" fill="#fff"/></svg>',
+"SG": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="7" fill="#ed2939"/><rect y="7" width="20" height="7" fill="#fff"/><circle cx="5" cy="3.5" r="2" fill="#fff"/><circle cx="6" cy="3.5" r="1.7" fill="#ed2939"/></svg>',
+"BR": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#009c3b"/><polygon points="10,2 18,7 10,12 2,7" fill="#ffdf00"/><circle cx="10" cy="7" r="2.6" fill="#002776"/></svg>',
+"AE": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="4.67" y="0" fill="#00732f"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><rect width="5" height="14" fill="#ff0000"/></svg>',
+"KR": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3" fill="#c60c30"/><path d="M10 4A1.5 1.5 0 0 1 10 7A1.5 1.5 0 0 0 10 10A3 3 0 0 0 10 4" fill="#003478"/></svg>',
+"PH": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="7" fill="#0038a8"/><rect y="7" width="20" height="7" fill="#ce1126"/><polygon points="0,0 7,7 0,14" fill="#fff"/><circle cx="2.3" cy="7" r="1" fill="#fcd116"/></svg>',
+"IN": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="4.67" fill="#ff9933"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#138808"/><circle cx="10" cy="7" r="1.3" fill="none" stroke="#000080" stroke-width="0.25"/></svg>',
+"CA": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#fff"/><rect width="5" height="14" fill="#ff0000"/><rect x="15" width="5" height="14" fill="#ff0000"/><path d="M10 3l1 2.2 2-1-0.6 2.3 2.1-0.2-1.6 1.7 1.6 1.7-2.1-0.2 0.6 2.3-2-1-1 2.2-1-2.2-2 1 0.6-2.3-2.1 0.2 1.6-1.7-1.6-1.7 2.1 0.2-0.6-2.3 2 1z" fill="#ff0000"/></svg>',
+"DE": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="4.67" fill="#000"/><rect width="20" height="4.67" y="4.67" fill="#dd0000"/><rect width="20" height="4.67" y="9.33" fill="#ffce00"/></svg>',
+"MY": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#fff"/><g fill="#cc0001"><rect y="0" width="20" height="1"/><rect y="2" width="20" height="1"/><rect y="4" width="20" height="1"/><rect y="6" width="20" height="1"/><rect y="8" width="20" height="1"/><rect y="10" width="20" height="1"/><rect y="12" width="20" height="1"/></g><rect width="10" height="7.5" fill="#010066"/><circle cx="4" cy="3.5" r="2" fill="#ffcc00"/><circle cx="4.9" cy="3.5" r="1.7" fill="#010066"/></svg>',
+"ES": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg>',
+"EU": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#003399"/><g fill="#ffcc00"><circle cx="10" cy="2.6" r="0.5"/><circle cx="10" cy="11.4" r="0.5"/><circle cx="5.6" cy="7" r="0.5"/><circle cx="14.4" cy="7" r="0.5"/><circle cx="6.9" cy="3.9" r="0.5"/><circle cx="13.1" cy="3.9" r="0.5"/><circle cx="6.9" cy="10.1" r="0.5"/><circle cx="13.1" cy="10.1" r="0.5"/></g></svg>',
+"JP": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3.4" fill="#bc002d"/></svg>',
+"TH": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#f4f5f8"/><rect width="20" height="2.8" fill="#a51931"/><rect y="11.2" width="20" height="2.8" fill="#a51931"/><rect y="4.67" width="20" height="4.67" fill="#2d2a4a"/></svg>',
+"PK": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#01411c"/><rect width="5" height="14" fill="#fff"/><circle cx="13" cy="7" r="2.6" fill="#fff"/><circle cx="14" cy="7" r="2.2" fill="#01411c"/></svg>',
+"PE": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="6.67" height="14" fill="#d91023"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#d91023"/></svg>',
+"MX": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="6.67" height="14" fill="#006847"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce1126"/><circle cx="10" cy="7" r="1.3" fill="#8b5a2b"/></svg>',
+"QA": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#8d1b3d"/><rect width="6" height="14" fill="#fff"/><polygon points="6,0 8,1.75 6,3.5" fill="#fff"/><polygon points="6,3.5 8,5.25 6,7" fill="#fff"/><polygon points="6,7 8,8.75 6,10.5" fill="#fff"/><polygon points="6,10.5 8,12.25 6,14" fill="#fff"/></svg>',
+"TR": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#e30a17"/><circle cx="8.5" cy="7" r="3" fill="#fff"/><circle cx="9.3" cy="7" r="2.5" fill="#e30a17"/></svg>',
+"NL": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="4.67" fill="#ae1c28"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#21468b"/></svg>',
+"IT": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="6.67" height="14" fill="#009246"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#ce2b37"/></svg>',
+"SE": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#006aa7"/><rect x="6" width="2.2" height="14" fill="#fecc00"/><rect y="5.9" width="20" height="2.2" fill="#fecc00"/></svg>',
+"BD": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#006a4e"/><circle cx="9" cy="7" r="3.2" fill="#f42a41"/></svg>',
+"KW": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="4.67" fill="#007a3d"/><rect width="20" height="4.67" y="4.67" fill="#fff"/><rect width="20" height="4.67" y="9.33" fill="#000"/><polygon points="0,0 5,7 0,14" fill="#ce1126"/></svg>',
+"SA": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#006c35"/><rect x="3" y="6.3" width="14" height="1.4" fill="#fff"/></svg>',
+"VN": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#da251d"/><polygon points="10,3.5 11.2,6.7 14.5,6.7 11.8,8.7 12.8,12 10,10 7.2,12 8.2,8.7 5.5,6.7 8.8,6.7" fill="#ffff00"/></svg>',
+"BT": '<svg viewBox="0 0 20 14" width="18" height="13"><polygon points="0,0 20,0 0,14" fill="#ffcc00"/><polygon points="20,0 20,14 0,14" fill="#ff4e12"/></svg>',
+"ME": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#c40308"/><rect x="1" y="1" width="18" height="12" fill="none" stroke="#d4af37" stroke-width="1"/><circle cx="10" cy="7" r="2.6" fill="#d4af37"/></svg>',
+"PW": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#4aadd6"/><circle cx="8.5" cy="7" r="3.4" fill="#ffde00"/></svg>',
+"CO": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="7" fill="#fcd116"/><rect width="20" height="3.5" y="7" fill="#003893"/><rect width="20" height="3.5" y="10.5" fill="#ce1126"/></svg>',
+"HK": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#de2910"/><circle cx="10" cy="7" r="3.6" fill="#fff"/></svg>',
+"FR": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="6.67" height="14" fill="#0055A4"/><rect x="6.67" width="6.67" height="14" fill="#fff"/><rect x="13.33" width="6.67" height="14" fill="#EF4135"/></svg>',
+"ZA": '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" fill="#fff"/><rect width="20" height="4.67" fill="#000c8a"/><rect width="20" height="4.67" y="9.33" fill="#de3831"/><polygon points="0,4.67 8,7 0,9.33" fill="#007847"/><polygon points="0,5.4 6,7 0,8.6" fill="#ffb612"/></svg>',
 }
-_FLAG_FALLBACK = '<svg viewBox="0 0 20 14"><rect width="20" height="14" rx="1.5" fill="#3a4a63"/><circle cx="10" cy="7" r="4" fill="none" stroke="#a8bdd0" stroke-width="0.8"/></svg>'
+_FLAG_FALLBACK = '<svg viewBox="0 0 20 14" width="18" height="13"><rect width="20" height="14" rx="1.5" fill="#3a4a63"/><circle cx="10" cy="7" r="4" fill="none" stroke="#a8bdd0" stroke-width="0.8"/></svg>'
 
 
 def _region_indicator_to_code(pair):
@@ -3475,6 +3607,14 @@ def render_page():
 
     # Regional News Activity Heatmap
     rh_html = regional_heatmap_html()
+
+    # V109: 30-Day Historical Price Table, News Mention Volume, DCA Calculator data
+    hist30_html = historical_30d_html()
+    nmv_cat_html, nmv_day_label, nmv_total, nmv_contributors, nmv_day_str = news_mention_volume_html()
+    dca_history_json = json.dumps([
+        {"t": r["t"], "c": round(r["c"], 6)} for r in (MARKET.get("hist_full") or [])
+    ])
+    dca_days_available = len(MARKET.get("hist_full") or [])
 
     # Sentiment Engine
     _isc_score, _isc_label = interest_score()
@@ -4398,6 +4538,19 @@ def render_page():
   /* FLOATING RETURN / BACK-TO-TOP */
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
+
+  /* V109: DCA Calculator, Historical Table, News Mention Volume */
+  .dca-row{{ display:flex; justify-content:space-between; padding:4px 0; font-size:14px; color:var(--tx); }}
+  .dca-row span:last-child{{ color:var(--br); font-weight:600; font-family:var(--mn); }}
+  .hist-table{{ width:100%; border-collapse:collapse; font-size:13px; font-family:var(--mn); margin-top:8px; }}
+  .hist-table th{{ text-align:left; color:var(--hdr); font-size:12px; padding:8px 6px; border-bottom:1px solid var(--b); white-space:nowrap; }}
+  .hist-table td{{ padding:6px; border-bottom:1px solid var(--b); color:var(--tx); white-space:nowrap; }}
+  .hist-table tr:hover td{{ background:rgba(3,177,252,.06); }}
+  .nmv-row{{ display:flex; align-items:center; gap:10px; padding:5px 0; }}
+  .nmv-cat{{ font-size:13px; color:var(--tx); width:150px; flex-shrink:0; }}
+  .nmv-bar-track{{ flex:1; height:8px; background:var(--s2); border-radius:4px; overflow:hidden; }}
+  .nmv-bar-fill{{ height:100%; background:var(--yl); }}
+  .nmv-n{{ font-size:13px; color:var(--br); font-family:var(--mn); width:30px; text-align:right; flex-shrink:0; }}
 
   /* ============================================================
      RESPONSIVE SAFETY NET (V107) \u2014 catch-all rules for phones and
@@ -5629,7 +5782,130 @@ def render_page():
       </div>
     </div>
 
+    <!-- SECTION 23: DOLLAR COST AVERAGING CALCULATOR (V109) -->
+    <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--tq)"><span class="sic">&#128176;</span> Dollar Cost Averaging Calculator</div>
+      <div class="trk-tag" style="color:var(--tx)">Compare weekly vs. monthly contributions using {dca_days_available} days of real historical XRP prices \u2014 not a hypothetical curve.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0">
+        <div>
+          <label style="font-size:13px;color:var(--tx);display:block;margin-bottom:4px">Weekly contribution ($)</label>
+          <input id="dca-weekly" type="number" value="25" min="0" step="1" style="width:100%;background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:8px 10px;color:var(--br);font-size:16px;font-family:var(--mn)">
+        </div>
+        <div>
+          <label style="font-size:13px;color:var(--tx);display:block;margin-bottom:4px">Monthly contribution ($)</label>
+          <input id="dca-monthly" type="number" value="100" min="0" step="1" style="width:100%;background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:8px 10px;color:var(--br);font-size:16px;font-family:var(--mn)">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:var(--s1);border:1px solid rgba(0,229,204,.3);border-radius:8px;padding:14px">
+          <div style="color:var(--tq);font-weight:700;font-size:15px;margin-bottom:8px">Weekly Plan</div>
+          <div class="dca-row"><span>Total Invested</span><span id="dca-w-invested">$0.00</span></div>
+          <div class="dca-row"><span>XRP Acquired</span><span id="dca-w-xrp">0 XRP</span></div>
+          <div class="dca-row"><span>Avg Cost / XRP</span><span id="dca-w-avgcost">$0.00</span></div>
+          <div class="dca-row"><span>Current Value</span><span id="dca-w-value">$0.00</span></div>
+          <div class="dca-row" style="border-top:1px solid var(--b);padding-top:6px;margin-top:6px"><span style="font-weight:700">Return</span><span id="dca-w-return" style="font-weight:700">$0.00</span></div>
+        </div>
+        <div style="background:var(--s1);border:1px solid rgba(0,229,204,.3);border-radius:8px;padding:14px">
+          <div style="color:var(--tq);font-weight:700;font-size:15px;margin-bottom:8px">Monthly Plan</div>
+          <div class="dca-row"><span>Total Invested</span><span id="dca-m-invested">$0.00</span></div>
+          <div class="dca-row"><span>XRP Acquired</span><span id="dca-m-xrp">0 XRP</span></div>
+          <div class="dca-row"><span>Avg Cost / XRP</span><span id="dca-m-avgcost">$0.00</span></div>
+          <div class="dca-row"><span>Current Value</span><span id="dca-m-value">$0.00</span></div>
+          <div class="dca-row" style="border-top:1px solid var(--b);padding-top:6px;margin-top:6px"><span style="font-weight:700">Return</span><span id="dca-m-return" style="font-weight:700">$0.00</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--tx);margin-top:10px;font-style:italic">Simulated using real daily close prices over the available history window. Not financial advice \u2014 past performance does not predict future results.</div>
+    </div>
+
+    <!-- SECTION 24: 30-DAY HISTORICAL PRICE DATA (V109) -->
+    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#128197;</span> 30-Day Historical Price Data</div>
+      <div class="trk-tag" style="color:var(--tx)">Daily OHLC, newest first. Same live Coinbase feed powering RSI and 52-week range above.</div>
+      {hist30_html}
+    </div>
+
+    <!-- SECTION 25: NEWS MENTION VOLUME (V109) -->
+    <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--yl)"><span class="sic">&#128240;</span> News Mention Volume <span style="font-weight:400;color:var(--tx);font-size:14px">({nmv_day_label})</span></div>
+      <div class="trk-tag" style="color:var(--tx)">Real story counts across the {hdr_feeds_total} RSS sources this site already tracks \u2014 never estimated. Locks in at 00:15 UTC each day.</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0">
+        <div style="background:var(--s1);border:1px solid rgba(255,204,0,.3);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--yl);font-family:var(--mn)">{nmv_total}</div>
+          <div style="font-size:12px;color:var(--tx)">total stories, aggregated</div>
+        </div>
+        <div style="background:var(--s1);border:1px solid rgba(255,204,0,.3);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--yl);font-family:var(--mn)">{nmv_contributors}</div>
+          <div style="font-size:12px;color:var(--tx)">contributing sources</div>
+        </div>
+      </div>
+      <div>{nmv_cat_html}</div>
+    </div>
+
   </div>
+
+    <script>
+      window.__DCA_HIST_DATA__ = {dca_history_json};
+function dcaCalculate() {{
+  var weeklyAmt = parseFloat(document.getElementById('dca-weekly').value) || 0;
+  var monthlyAmt = parseFloat(document.getElementById('dca-monthly').value) || 0;
+  var hist = window.__DCA_HIST_DATA__ || [];
+  if (hist.length < 2) return;
+
+  var currentPrice = hist[hist.length - 1].c;
+  var startT = hist[0].t;
+
+  function priceNear(targetT) {{
+    var best = hist[0];
+    for (var i = 0; i < hist.length; i++) {{
+      if (hist[i].t <= targetT) {{ best = hist[i]; }} else {{ break; }}
+    }}
+    return best.c;
+  }}
+
+  function simulate(amount, intervalDays) {{
+    if (amount <= 0) return {{ invested: 0, xrp: 0 }};
+    var invested = 0, xrp = 0;
+    var stepSeconds = intervalDays * 86400;
+    var t = startT;
+    var lastT = hist[hist.length - 1].t;
+    while (t <= lastT) {{
+      var p = priceNear(t);
+      if (p > 0) {{ xrp += amount / p; invested += amount; }}
+      t += stepSeconds;
+    }}
+    return {{ invested: invested, xrp: xrp }};
+  }}
+
+  var weekly = simulate(weeklyAmt, 7);
+  var monthly = simulate(monthlyAmt, 30);
+
+  function render(prefix, result) {{
+    var value = result.xrp * currentPrice;
+    var ret = value - result.invested;
+    var retPct = result.invested > 0 ? (ret / result.invested * 100) : 0;
+    var avgCost = result.xrp > 0 ? (result.invested / result.xrp) : 0;
+    document.getElementById(prefix + '-invested').textContent = '$' + result.invested.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+    document.getElementById(prefix + '-xrp').textContent = result.xrp.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' XRP';
+    document.getElementById(prefix + '-avgcost').textContent = '$' + avgCost.toFixed(4);
+    document.getElementById(prefix + '-value').textContent = '$' + value.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+    var retEl = document.getElementById(prefix + '-return');
+    var sign = ret >= 0 ? '+' : '';
+    retEl.textContent = sign + '$' + ret.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' (' + sign + retPct.toFixed(2) + '%)';
+    retEl.style.color = ret >= 0 ? 'var(--gr)' : 'var(--rd)';
+  }}
+
+  render('dca-w', weekly);
+  render('dca-m', monthly);
+}}
+
+document.addEventListener('DOMContentLoaded', function() {{
+  var wInput = document.getElementById('dca-weekly');
+  var mInput = document.getElementById('dca-monthly');
+  if (wInput) wInput.addEventListener('input', dcaCalculate);
+  if (mInput) mInput.addEventListener('input', dcaCalculate);
+  dcaCalculate();
+}});
+    </script>
 
   <!-- FLOATING RETURN / BACK-TO-TOP -->
   <button id="back-to-top" title="Return to XRP Complete" aria-label="Return to XRP Complete">&#8679;</button>
