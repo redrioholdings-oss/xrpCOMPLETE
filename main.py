@@ -5,6 +5,15 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V108 changes:
+  1. Correction: V107 darkened the shared card background (--s1) per an
+     initial reading of user markup. Clarified request was the opposite —
+     boxes needed to be BRIGHTER than the original V106 baseline, not
+     darker. --s1 changed 0a0a0a (V106) -> 050505 (V107, wrong direction)
+     -> 161f2e (V108, ~3x brighter luminance than the V106 original).
+     Borders on .si and .acct also strengthened (rgba(117,188,255,.25/.
+     var(--b)) -> .35/.4 opacity) for additional definition.
+
 V107 changes:
   1. Permanent cross-platform flag fix: all 132 flag-emoji instances (36
      distinct countries/regions) now render via inline SVG through a single
@@ -94,7 +103,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "107"
+APP_VERSION = "108"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -3635,7 +3644,7 @@ def render_page():
 <title>{APP_NAME} \u2014 {TAGLINE}</title>
 <style>
   :root{{
-    --bg:#000; --s1:#050505; --s2:#111; --b:#1a2030;
+    --bg:#000; --s1:#161f2e; --s2:#111; --b:#1a2030;
     --gr:#48ff82; --grd:rgba(72,255,130,.1);
     --rd:#ff4060; --rdd:rgba(255,64,96,.1);
     --yl:#ffcc00; --yld:rgba(255,204,0,.1);
@@ -3677,7 +3686,7 @@ def render_page():
   /* STATUS ROW — compact horizontal rectangles */
   .srow{{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }}
   @media(max-width:700px){{ .srow{{ grid-template-columns:1fr; }} }}
-  .si{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; }}
+  .si{{ background:var(--s1); border:1px solid rgba(117,188,255,.35); border-radius:8px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:64px; }}
   .si-lbl{{ color:#ffffff; font-size:17px; font-family:var(--mn); font-weight:700; letter-spacing:.5px; display:flex; align-items:center; gap:9px; white-space:nowrap; }}
   .si-lbl .ic{{ font-size:22px; }}
   .sv{{ font-weight:800; font-size:22px; font-family:var(--mn); line-height:1; text-align:right; }}
@@ -3696,7 +3705,7 @@ def render_page():
   /* SECTION 3 — technical panels (RSI, S&R, Time Machine, 52-Week) */
   .grid2{{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0; align-items:stretch; }}
   .col{{ display:flex; flex-direction:column; gap:10px; }}
-  .acct{{ background:var(--s1); border:1px solid rgba(117,188,255,.25); border-radius:10px; padding:14px; }}
+  .acct{{ background:var(--s1); border:1px solid rgba(117,188,255,.4); border-radius:10px; padding:14px; }}
   .acct.grow{{ flex:1; }}   /* lets 52-week + time machine match column height */
   .sec-title{{ font-size:17px; text-transform:uppercase; letter-spacing:2px; font-family:var(--mn); color:#ffffff; margin-bottom:12px; font-weight:800; display:flex; align-items:center; gap:10px; }}
   .sec-title .sic{{ font-size:22px; }}   /* header icon = same size as status-row icons */
