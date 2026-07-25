@@ -122,7 +122,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "121"
+APP_VERSION = "122"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -5187,11 +5187,11 @@ def render_page(page="main"):
             display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }}
   .xnav a{{ display:inline-block; padding:8px 18px; border:1px solid var(--hdr);
            border-radius:4px; background:transparent; color:var(--hdr);
-           font-family:var(--mn); font-size:13px; letter-spacing:1px;
+           font-family:var(--mn); font-size:15px; font-weight:700; letter-spacing:1.5px;
            text-decoration:none; white-space:nowrap; line-height:1.1; }}
   .xnav a:hover{{ background:rgba(3,177,252,.15); }}
-  .xnav a.on{{ background:var(--hdr); color:#000; font-weight:700; }}
-  @media(max-width:480px){{ .xnav a{{ padding:7px 13px; font-size:12px; }}
+  .xnav a.on{{ background:var(--hdr); color:#000; font-weight:800; }}
+  @media(max-width:480px){{ .xnav a{{ padding:7px 13px; font-size:12px; letter-spacing:1px; }}
                            .xnav-in{{ gap:6px; }} }}
 </style>
 </head>
@@ -6543,13 +6543,14 @@ def render_page(page="main"):
         </div>
       </div>
       <div>{nmv_cat_html}</div>
+    </div>
 """
 
     _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'competitive', 'regradar', 'clarity', 'enterprise', 'advmetrics', 'regledger'], 'markets': ['rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'clocks', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
-    _tail = f"""    </div>
+    _tail = f"""    
 
   </div>
 
