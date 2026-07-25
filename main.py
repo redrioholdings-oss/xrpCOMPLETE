@@ -122,7 +122,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "120"
+APP_VERSION = "121"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3875,7 +3875,7 @@ def regulatory_sections():
     return "".join(out)
 
 
-def render_page():
+def render_page(page="main"):
     checks, passed, total, overall = run_preflight()
     overall_color = "#48ff82" if overall == "PASS" else "#ff4060"
     boot_str = BOOT_TIME.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -4335,7 +4335,7 @@ def render_page():
 
     _regnew = regulatory_sections()
 
-    return f"""<!DOCTYPE html>
+    _head = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -5179,9 +5179,30 @@ def render_page():
   .rg-flag{{ border:1px solid var(--or); border-radius:8px; padding:11px 14px; margin-top:12px;
              font-size:12px; color:var(--br); line-height:1.6; background:rgba(204,95,0,.07); }}
   @media(max-width:480px){{ .rg-c{{ flex-direction:column; gap:4px; }} .rg-tbl{{ font-size:12px; }} }}
+  /* ---- V121 six-page navigation ---- */
+  .xnav{{ position:sticky; top:0; z-index:60; background:rgba(10,16,28,.97);
+         border-bottom:1px solid var(--b); backdrop-filter:blur(6px); }}
+  .xnav-in{{ max-width:1280px; margin:0 auto; display:flex; gap:2px; overflow-x:auto;
+            -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:0 10px; }}
+  .xnav-in::-webkit-scrollbar{{ display:none; }}
+  .xnav a{{ flex:0 0 auto; padding:11px 15px; font-family:var(--mn); font-size:13px;
+           letter-spacing:.9px; text-decoration:none; color:var(--tx);
+           border-bottom:2px solid transparent; white-space:nowrap; }}
+  .xnav a:hover{{ color:var(--hdr); }}
+  .xnav a.on{{ color:var(--hdr); border-bottom-color:var(--or); font-weight:700; }}
+  @media(max-width:480px){{ .xnav a{{ padding:10px 12px; font-size:12px; }} }}
 </style>
 </head>
-<body id="top">
+"""
+
+    _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
+              ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
+              ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"))
+    _nav = ('<nav class="xnav"><div class="xnav-in">' + ''.join(
+        f'<a href="{h}" class="{"on" if k == page else ""}">{t}</a>'
+        for k, h, t in _pages) + '</div></nav>')
+
+    _chrome = f"""<body id="top">
 
   <!-- BREAKING NEWS BAR -->
   <div id="breaking">
@@ -5199,7 +5220,7 @@ def render_page():
     <!-- HEADER -->
     <div class="hdr">
       <div class="logo">
-        <div class="icon"><img src="/logo.jpg" alt="XRP Complete" width="59" height="125"></div>
+        <div class="icon"><img src="/logo.jpg" alt="XRP Complete" width="47" height="100"></div>
         <div>
           <div class="title">{APP_NAME}</div>
           <div class="sub" style="font-size:17px;color:var(--hdr);letter-spacing:1.5px">The <i>NEW</i> XRP Intelligence Standard</div>
@@ -5222,7 +5243,12 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 2: STATUS ROW (3 compact rectangles) -->
+{_nav}
+"""
+
+    _B = {}
+
+    _B['status'] = f"""    <!-- SECTION 2: STATUS ROW (3 compact rectangles) -->
     <div class="srow">
       <div class="si">
         <span class="si-lbl"><span class="ic" style="color:var(--gr);font-weight:900">$</span> XRP / USD</span>
@@ -5241,7 +5267,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 3: RSI / Support-Resistance / Time Machine / 52-Week -->
+"""
+
+    _B['rsi'] = f"""    <!-- SECTION 3: RSI / Support-Resistance / Time Machine / 52-Week -->
     <div class="grid2">
       <!-- LEFT COLUMN: RSI + 52-Week -->
       <div class="col">
@@ -5314,7 +5342,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 4: LIVE XRP/USD CHART -->
+"""
+
+    _B['chart'] = f"""    <!-- SECTION 4: LIVE XRP/USD CHART -->
     <div class="acct" style="padding:10px;border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4CA</span> Live XRP/USD Chart</div>
       <div style="height:440px;border-radius:8px;overflow:hidden;border:1px solid var(--b)">
@@ -5327,7 +5357,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 4b: XRP GLOBAL LIQUIDITY TRACKER (V103) -->
+"""
+
+    _B['liquidity'] = f"""    <!-- SECTION 4b: XRP GLOBAL LIQUIDITY TRACKER (V103) -->
     <div class="acct" style="padding:12px;border-color:rgba(117,188,255,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--bl)"><span class="sic">\U0001F4A7</span> XRP Global Liquidity Tracker</div>
       <div style="font-size:15px;color:var(--tx);line-height:1.55;margin:6px 2px 12px 2px">
@@ -5366,7 +5398,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 5: ON-CHAIN INTELLIGENCE + WHALE ALERT FEED -->
+"""
+
+    _B['onchain'] = f"""    <!-- SECTION 5: ON-CHAIN INTELLIGENCE + WHALE ALERT FEED -->
     <div class="oc-grid">
       <div class="acct" style="border-color:rgba(0,229,204,.35)">
         <div class="sec-title" style="color:var(--hdr)"><span class="sic">\u26D3\uFE0F</span> On-Chain Intelligence</div>
@@ -5416,7 +5450,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 6: XRP ECOSYSTEM -->
+"""
+
+    _B['ecosystem'] = f"""    <!-- SECTION 6: XRP ECOSYSTEM -->
     <div class="eco-wrap">
       <div class="eco-head">
         <span class="gicon">\U0001F310</span>
@@ -5471,7 +5507,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 7: MAINSTREAM INTEGRATION MONITOR (title + tagline + legend key) -->
+"""
+
+    _B['mainstream'] = f"""    <!-- SECTION 7: MAINSTREAM INTEGRATION MONITOR (title + tagline + legend key) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0</span> Mainstream Integration Monitor</div>
       <div class="trk-tag">XRP is no longer knocking on the door of traditional finance \u2014 it's building new springboards for growth and utilization.</div>
@@ -5485,7 +5523,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 8: INSTITUTIONAL PARTNERSHIP TRACKER (separate section: 20 institutions, 5 rows of 4) -->
+"""
+
+    _B['instpart'] = f"""    <!-- SECTION 8: INSTITUTIONAL PARTNERSHIP TRACKER (separate section: 20 institutions, 5 rows of 4) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3DB\uFE0F</span> Institutional Partnership Tracker</div>
       <div class="trk-grid">
@@ -5494,7 +5534,9 @@ def render_page():
       <div id="trk-empty" class="trk-empty" style="display:none">No institutions in this category are currently available.</div>
     </div>
 
-    <!-- SECTION 9: XRP × TRADITIONAL FINANCE — INTEGRATION TIMELINE -->
+"""
+
+    _B['tradfi'] = f"""    <!-- SECTION 9: XRP × TRADITIONAL FINANCE — INTEGRATION TIMELINE -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C5</span> XRP \u00D7 Traditional Finance \u2014 Integration Timeline</div>
       <div class="tl-wrap">
@@ -5505,7 +5547,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 10: TOP 20 XRP STORIES (two subsections) -->
+"""
+
+    _B['top20'] = f"""    <!-- SECTION 10: TOP 20 XRP STORIES (two subsections) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3C6</span> Top 20 XRP Stories</div>
       <div class="eco-sub-h" style="padding:0"><span style="font-size:17px">\U0001F4F0</span> Top 20 Current Stories</div>
@@ -5518,7 +5562,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 11: US INTELLIGENCE + GLOBAL PULSE (2-column, news-derived) -->
+"""
+
+    _B['usintel'] = f"""    <!-- SECTION 11: US INTELLIGENCE + GLOBAL PULSE (2-column, news-derived) -->
     <div class="intel-grid">
       <div class="intel" style="border-color:rgba(3,177,252,.35)">
         <div class="intel-h">
@@ -5544,7 +5590,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 12: REGIONAL DISCOURSE (news-derived) -->
+"""
+
+    _B['regdisc'] = f"""    <!-- SECTION 12: REGIONAL DISCOURSE (news-derived) -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5FA\uFE0F</span> Regional Discourse</div>
       <div class="rd-grid">
@@ -5552,7 +5600,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 13: SIGNAL SCOREBOARD -->
+"""
+
+    _B['scoreboard'] = f"""    <!-- SECTION 13: SIGNAL SCOREBOARD -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4E1</span> Signal Scoreboard</div>
       <div class="sb-grid">
@@ -5572,7 +5622,9 @@ def render_page():
       <div class="sb-bar"><div class="sb-fill" style="width:{sb_bull_pct}%"></div></div>
     </div>
 
-    <!-- SECTION 14: GLOBAL NEWS FEED + RIGHT RAIL -->
+"""
+
+    _B['newsfeed'] = f"""    <!-- SECTION 14: GLOBAL NEWS FEED + RIGHT RAIL -->
     <div class="ledger-wrap">
       <div class="acct" style="border-color:rgba(3,177,252,.35);margin:0">
         <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5DE\uFE0F</span> Global News Feed &amp; Search</div>
@@ -5624,7 +5676,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 15: ANALYTICS LAB -->
+"""
+
+    _B['analytics'] = f"""    <!-- SECTION 15: ANALYTICS LAB -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F52C</span> Analytics Lab</div>
       <div class="lab3">
@@ -5664,7 +5718,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 16: XRP COMPLETE LEADERBOARD -->
+"""
+
+    _B['leaderboard'] = f"""    <!-- SECTION 16: XRP COMPLETE LEADERBOARD -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3C6</span> XRP Complete Leaderboard</div>
       <div class="trk-tag">Top sources, most active regions, and live intelligence \u2014 the XRP Complete rankings.</div>
@@ -5693,7 +5749,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (twice daily — AM 12:00 PM CST, PM 9:00 PM CST) -->
+"""
+
+    _B['brief'] = f"""    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (twice daily — AM 12:00 PM CST, PM 9:00 PM CST) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr);margin-bottom:10px"><span class="sic">\U0001F52E</span> XRP Intelligence Brief</div>
 
@@ -5721,7 +5779,9 @@ def render_page():
     </div>
     <script type="application/json" id="brief-archive-data">{_archive_json}</script>
 
-    <!-- SECTION 18: WORLD BRIEFING CLOCKS -->
+"""
+
+    _B['clocks'] = f"""    <!-- SECTION 18: WORLD BRIEFING CLOCKS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F310</span> World Briefing Clocks</div>
       <div class="trk-tag" style="color:var(--tx)">Local time across major crypto hubs, with each city's 1st (12:00 PM CST) and 2nd (9:00 PM CST) briefing time \u2014 orange by day, gray by night.</div>
@@ -5730,7 +5790,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 19: UNIQUE DISPLAYS -->
+"""
+
+    _B['unique'] = f"""    <!-- SECTION 19: UNIQUE DISPLAYS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3A8</span> Unique Displays</div>
       <div class="ud-grid">
@@ -5756,7 +5818,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 20: LONGITUDINAL VALUE MARKERS -->
+"""
+
+    _B['longitudinal'] = f"""    <!-- SECTION 20: LONGITUDINAL VALUE MARKERS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C8</span> Longitudinal Value Markers</div>
       <div class="trk-tag" style="color:var(--tx)">XRP/USD price performance across key windows.</div>
@@ -5765,7 +5829,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 21: REGIONAL NEWS ACTIVITY HEATMAP -->
+"""
+
+    _B['heatmap'] = f"""    <!-- SECTION 21: REGIONAL NEWS ACTIVITY HEATMAP -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5FA\uFE0F</span> Regional News Activity Heatmap</div>
       <div class="trk-tag" style="color:var(--tx)">XRP stories by region today \u2014 brighter means more coverage.</div>
@@ -5774,7 +5840,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 22: SENTIMENT ENGINE -->
+"""
+
+    _B['sentiment'] = f"""    <!-- SECTION 22: SENTIMENT ENGINE -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F9E0</span> Sentiment Engine</div>
 
@@ -5814,7 +5882,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 23: COMPETITIVE BRIEFING -->
+"""
+
+    _B['competitive'] = f"""    <!-- SECTION 23: COMPETITIVE BRIEFING -->
     <div class="acct" style="border-color:rgba(117,188,255,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\u2694\uFE0F</span> Competitive Briefing</div>
 
@@ -5857,7 +5927,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 24: RIPPLE EXECUTIVE TRACKER + XRPL DEV ACTIVITY -->
+"""
+
+    _B['execdev'] = f"""    <!-- SECTION 24: RIPPLE EXECUTIVE TRACKER + XRPL DEV ACTIVITY -->
     <div class="ed-grid" style="margin:10px 0">
       <div class="ed-panel" style="border-color:rgba(255,153,0,.25)">
         <div class="ed-head">
@@ -5898,7 +5970,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 25: REGULATORY RADAR -->
+"""
+
+    _B['regradar'] = f"""    <!-- SECTION 25: REGULATORY RADAR -->
     <div class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3DB\uFE0F</span> Regulatory Radar</div>
 
@@ -5934,7 +6008,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 26: CLARITY ACT TRACKER -->
+"""
+
+    _B['clarity'] = f"""    <!-- SECTION 26: CLARITY ACT TRACKER -->
     <div class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F3DB\uFE0F</span> CLARITY Act Tracker</div>
@@ -5951,7 +6027,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
+"""
+
+    _B['enterprise'] = f"""    <!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F310</span> Global XRP Enterprise &amp; Partnership Ledger</div>
@@ -6000,7 +6078,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 28: ADVANCED METRICS -->
+"""
+
+    _B['advmetrics'] = f"""    <!-- SECTION 28: ADVANCED METRICS -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F52C</span> Advanced Metrics</div>
       <div class="trk-tag" style="color:var(--tx)">Technical indicators, order book depth, and reference specs \u2014 all computed from live, verifiable market data.</div>
@@ -6058,7 +6138,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 29: PRACTICAL TOOLS -->
+"""
+
+    _B['practical'] = f"""    <!-- SECTION 29: PRACTICAL TOOLS -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0\uFE0F</span> Practical Tools</div>
       <div class="pt-cols">
@@ -6241,7 +6323,9 @@ def render_page():
     </div>
 
   <!-- MAIN -->
-    <!-- SECTION 30: XRP COMPLETE EXCLUSIVE INTELLIGENCE (flagship) -->
+"""
+
+    _B['exclusive'] = f"""    <!-- SECTION 30: XRP COMPLETE EXCLUSIVE INTELLIGENCE (flagship) -->
     <div class="acct" style="border-color:rgba(255,204,0,.4);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F3C6</span> XRP Complete Exclusive Intelligence</div>
@@ -6313,7 +6397,9 @@ def render_page():
       </div>
     </div>
 
-  <!-- REGULATORY & LEDGER WATCH (V66) -->
+"""
+
+    _B['regledger'] = f"""  <!-- REGULATORY & LEDGER WATCH (V66) -->
     <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F4E1</span> Regulatory &amp; Ledger Watch</div>
@@ -6341,10 +6427,14 @@ def render_page():
       </div>
     </div>
 
-  <!-- V119: SIX REGULATORY SECTIONS -->
+"""
+
+    _B['regnew'] = f"""  <!-- V119: SIX REGULATORY SECTIONS -->
     {_regnew}
 
-  <!-- XRP COMMUNITY HUB (V67) -->
+"""
+
+    _B['community'] = f"""  <!-- XRP COMMUNITY HUB (V67) -->
     <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0 40px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F465</span> XRP Community Hub</div>
@@ -6388,7 +6478,9 @@ def render_page():
       </div>
     </div>
 
-    <!-- SECTION 23: DOLLAR COST AVERAGING CALCULATOR (V109) -->
+"""
+
+    _B['dca'] = f"""    <!-- SECTION 23: DOLLAR COST AVERAGING CALCULATOR (V109) -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--tq)"><span class="sic">&#128176;</span> Dollar Cost Averaging Calculator</div>
       <div class="trk-tag" style="color:var(--tx)">Compare weekly vs. monthly contributions using {dca_days_available} days of real historical XRP prices \u2014 not a hypothetical curve.</div>
@@ -6423,14 +6515,18 @@ def render_page():
       <div style="font-size:11px;color:var(--tx);margin-top:10px;font-style:italic">Simulated using real daily close prices over the available history window. Not financial advice \u2014 past performance does not predict future results.</div>
     </div>
 
-    <!-- SECTION 24: 30-DAY HISTORICAL PRICE DATA (V109) -->
+"""
+
+    _B['hist30'] = f"""    <!-- SECTION 24: 30-DAY HISTORICAL PRICE DATA (V109) -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#128197;</span> 30-Day Historical Price Data</div>
       <div class="trk-tag" style="color:var(--tx)">Daily OHLC, newest first. Same live Coinbase feed powering RSI and 52-week range above.</div>
       {hist30_html}
     </div>
 
-    <!-- SECTION 25: NEWS MENTION VOLUME (V109) -->
+"""
+
+    _B['nmv'] = f"""    <!-- SECTION 25: NEWS MENTION VOLUME (V109) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--yl)"><span class="sic">&#128240;</span> News Mention Volume <span style="font-weight:400;color:var(--tx);font-size:14px">({nmv_day_label})</span></div>
       <div class="trk-tag" style="color:var(--tx)">Real story counts across the {hdr_feeds_total} RSS sources this site already tracks \u2014 never estimated. Locks in at 00:15 UTC each day.</div>
@@ -6445,7 +6541,13 @@ def render_page():
         </div>
       </div>
       <div>{nmv_cat_html}</div>
-    </div>
+"""
+
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'competitive', 'regradar', 'clarity', 'enterprise', 'advmetrics', 'regledger'], 'markets': ['rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'clocks', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+
+    _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
+
+    _tail = f"""    </div>
 
   </div>
 
@@ -6877,13 +6979,41 @@ document.addEventListener('DOMContentLoaded', function() {{
 </body>
 </html>"""
 
+    return _head + _chrome + _body + _tail
+
+
 
 # ─────────────────────────────────────────────────────────────────────
 # ROUTES
 # ─────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
-    return Response(replace_flags_with_svg(render_page()), mimetype="text/html")
+    return Response(replace_flags_with_svg(render_page("main")), mimetype="text/html")
+
+
+@app.route("/markets")
+def page_markets():
+    return Response(replace_flags_with_svg(render_page("markets")), mimetype="text/html")
+
+
+@app.route("/news")
+def page_news():
+    return Response(replace_flags_with_svg(render_page("news")), mimetype="text/html")
+
+
+@app.route("/institutional")
+def page_institutional():
+    return Response(replace_flags_with_svg(render_page("institutional")), mimetype="text/html")
+
+
+@app.route("/regulatory")
+def page_regulatory():
+    return Response(replace_flags_with_svg(render_page("regulatory")), mimetype="text/html")
+
+
+@app.route("/community")
+def page_community():
+    return Response(replace_flags_with_svg(render_page("community")), mimetype="text/html")
 
 
 @app.route("/logo.jpg")
