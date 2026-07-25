@@ -5180,17 +5180,19 @@ def render_page(page="main"):
              font-size:12px; color:var(--br); line-height:1.6; background:rgba(204,95,0,.07); }}
   @media(max-width:480px){{ .rg-c{{ flex-direction:column; gap:4px; }} .rg-tbl{{ font-size:12px; }} }}
   /* ---- V121 six-page navigation ---- */
-  .xnav{{ position:sticky; top:0; z-index:60; background:rgba(10,16,28,.97);
-         border-bottom:1px solid var(--b); backdrop-filter:blur(6px); }}
-  .xnav-in{{ max-width:1280px; margin:0 auto; display:flex; gap:2px; overflow-x:auto;
-            -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:0 10px; }}
-  .xnav-in::-webkit-scrollbar{{ display:none; }}
-  .xnav a{{ flex:0 0 auto; padding:11px 15px; font-family:var(--mn); font-size:13px;
-           letter-spacing:.9px; text-decoration:none; color:var(--tx);
-           border-bottom:2px solid transparent; white-space:nowrap; }}
-  .xnav a:hover{{ color:var(--hdr); }}
-  .xnav a.on{{ color:var(--hdr); border-bottom-color:var(--or); font-weight:700; }}
-  @media(max-width:480px){{ .xnav a{{ padding:10px 12px; font-size:12px; }} }}
+  .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
+         border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
+         padding:10px 0; }}
+  .xnav-in{{ max-width:1280px; margin:0 auto; padding:0 10px;
+            display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }}
+  .xnav a{{ display:inline-block; padding:8px 18px; border:1px solid var(--hdr);
+           border-radius:4px; background:transparent; color:var(--hdr);
+           font-family:var(--mn); font-size:13px; letter-spacing:1px;
+           text-decoration:none; white-space:nowrap; line-height:1.1; }}
+  .xnav a:hover{{ background:rgba(3,177,252,.15); }}
+  .xnav a.on{{ background:var(--hdr); color:#000; font-weight:700; }}
+  @media(max-width:480px){{ .xnav a{{ padding:7px 13px; font-size:12px; }}
+                           .xnav-in{{ gap:6px; }} }}
 </style>
 </head>
 """
