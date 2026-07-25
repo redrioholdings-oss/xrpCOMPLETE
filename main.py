@@ -5,26 +5,6 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
-V110 changes:
-  1. Site restructured from one very long page into 6 purpose-grouped pages:
-     Main (/), Markets (/markets), News (/news), Institutional
-     (/institutional), Regulatory (/regulatory), Community (/community).
-     All 35 content sections redistributed with zero loss - each appears
-     exactly once site-wide (verified programmatically).
-  2. Main landing page carries the 12 most-sought features: RSI Signals,
-     52-Week Range, Support & Resistance, Price Time Machine, Live Chart,
-     Liquidity Tracker, On-Chain Intelligence, Top 20 Stories, Signal
-     Scoreboard, CLARITY Act Tracker, Practical Tools, and the flagship
-     Exclusive Intelligence section.
-  3. Horizontal navigation bar added: centered links, framed by light-blue
-     (--bl) lines above and below, with active-page highlighting.
-  4. Two structural bugs found and fixed during the split: the page
-     wrapper's closing </div> lived inside the last section (which would
-     have left 5 of 6 pages with unbalanced HTML), and the DCA calculator's
-     <script> block was physically inside the News section while its HTML
-     lives on Markets (which would have left the calculator visible but
-     completely non-functional). Both moved into the shared footer.
-
 V109 changes:
   1. Dollar Cost Averaging Calculator: weekly vs monthly contribution
      comparison using real daily close prices (reuses the same Coinbase
@@ -141,7 +121,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "110"
+APP_VERSION = "109"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -630,23 +610,11 @@ def fetch_fx():
         pass
 
 
-def _track_data_health(success):
-    day = datetime.now(timezone.utc).date().isoformat()
-    bucket = DATA_HEALTH_HISTORY.setdefault(day, {"checks": 0, "successes": 0})
-    bucket["checks"] += 1
-    if success:
-        bucket["successes"] += 1
-    if len(DATA_HEALTH_HISTORY) > DATA_HEALTH_HISTORY_MAX:
-        for old_day in sorted(DATA_HEALTH_HISTORY.keys())[:len(DATA_HEALTH_HISTORY) - DATA_HEALTH_HISTORY_MAX]:
-            del DATA_HEALTH_HISTORY[old_day]
-
-
 def _bg_refresh():
     n = 0
     while True:
         try:
             fetch_market()
-            _track_data_health(True)
             if n % 5 == 0:
                 fetch_fx()
                 fetch_competitors()
@@ -656,7 +624,7 @@ def _bg_refresh():
             if n % 60 == 0:  # check hourly whether the 3-day static directory refresh is due
                 load_static_partner_directory()
         except Exception:
-            _track_data_health(False)
+            pass
         n += 1
         time.sleep(60)
 
@@ -1547,12 +1515,6 @@ NEWS_VOLUME_HISTORY = {}  # date_str -> {"total","sources":set,"by_cat":{},"_key
                           # tracks. Never fabricated or estimated; builds up over time like
                           # SENTIMENT_HISTORY above. Used by "News Mention Volume" (V109).
 NEWS_VOLUME_HISTORY_MAX = 30
-DATA_HEALTH_HISTORY = {}  # date_str -> {"checks":N,"successes":N} \u2014 real success/failure count
-                          # of every fetch_market() cycle (runs every 60s). Powers the /status
-                          # page (V110). This measures data-feed reliability, not literal server
-                          # uptime (a downed server can't log its own downtime) \u2014 the /status
-                          # page is explicit about that distinction.
-DATA_HEALTH_HISTORY_MAX = 30
 SENTIMENT_HISTORY_MAX = 30
 
 def tech_specs_html():
@@ -3356,9 +3318,7 @@ def replace_flags_with_svg(html_text):
     return _FLAG_EMOJI_RE.sub(repl, html_text)
 
 
-def render_page(page="main"):
-    _active_page = page
-
+def render_page():
     checks, passed, total, overall = run_preflight()
     overall_color = "#48ff82" if overall == "PASS" else "#ff4060"
     boot_str = BOOT_TIME.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -3816,7 +3776,7 @@ def render_page(page="main"):
             '</div>'
         )
 
-        _header_html = f"""<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -4616,13 +4576,6 @@ def render_page(page="main"):
     .w{{ padding:6px 8px; }}
     .sic{{ font-size:15px; }}
   }}
-
-  .site-nav{{ border-top:2px solid var(--bl); border-bottom:2px solid var(--bl); margin:0 0 18px 0; }}
-  .site-nav-inner{{ display:flex; justify-content:center; align-items:center; gap:36px; flex-wrap:wrap; padding:12px 10px; }}
-  .nav-link{{ color:var(--tx); text-decoration:none; font-weight:800; font-size:13px; letter-spacing:1.5px; padding:4px 2px; border-bottom:2px solid transparent; }}
-  .nav-link:hover{{ color:var(--hdr); }}
-  .nav-link.nav-active{{ color:var(--hdr); border-bottom:2px solid var(--hdr); }}
-  @media(max-width:700px){{ .site-nav-inner{{ gap:18px; font-size:12px; }} }}
 </style>
 </head>
 <body id="top">
@@ -4666,19 +4619,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    
-    <nav class="site-nav">
-      <div class="site-nav-inner">
-        <a href="/" class="nav-link{' nav-active' if _active_page == 'main' else ''}">MAIN</a>
-        <a href="/markets" class="nav-link{' nav-active' if _active_page == 'markets' else ''}">MARKETS</a>
-        <a href="/news" class="nav-link{' nav-active' if _active_page == 'news' else ''}">NEWS</a>
-        <a href="/institutional" class="nav-link{' nav-active' if _active_page == 'institutional' else ''}">INSTITUTIONAL</a>
-        <a href="/regulatory" class="nav-link{' nav-active' if _active_page == 'regulatory' else ''}">REGULATORY</a>
-        <a href="/community" class="nav-link{' nav-active' if _active_page == 'community' else ''}">COMMUNITY</a>
-      </div>
-    </nav>
-"""
-    _sec_0_html = f"""<!-- SECTION 2: STATUS ROW (3 compact rectangles) -->
+    <!-- SECTION 2: STATUS ROW (3 compact rectangles) -->
     <div class="srow">
       <div class="si">
         <span class="si-lbl"><span class="ic" style="color:var(--gr);font-weight:900">$</span> XRP / USD</span>
@@ -4697,8 +4638,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_1_html = f"""<!-- SECTION 3: RSI / Support-Resistance / Time Machine / 52-Week -->
+    <!-- SECTION 3: RSI / Support-Resistance / Time Machine / 52-Week -->
     <div class="grid2">
       <!-- LEFT COLUMN: RSI + 52-Week -->
       <div class="col">
@@ -4771,8 +4711,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_2_html = f"""<!-- SECTION 4: LIVE XRP/USD CHART -->
+    <!-- SECTION 4: LIVE XRP/USD CHART -->
     <div class="acct" style="padding:10px;border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4CA</span> Live XRP/USD Chart</div>
       <div style="height:440px;border-radius:8px;overflow:hidden;border:1px solid var(--b)">
@@ -4785,8 +4724,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_3_html = f"""<!-- SECTION 4b: XRP GLOBAL LIQUIDITY TRACKER (V103) -->
+    <!-- SECTION 4b: XRP GLOBAL LIQUIDITY TRACKER (V103) -->
     <div class="acct" style="padding:12px;border-color:rgba(117,188,255,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--bl)"><span class="sic">\U0001F4A7</span> XRP Global Liquidity Tracker</div>
       <div style="font-size:15px;color:var(--tx);line-height:1.55;margin:6px 2px 12px 2px">
@@ -4825,8 +4763,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_4_html = f"""<!-- SECTION 5: ON-CHAIN INTELLIGENCE + WHALE ALERT FEED -->
+    <!-- SECTION 5: ON-CHAIN INTELLIGENCE + WHALE ALERT FEED -->
     <div class="oc-grid">
       <div class="acct" style="border-color:rgba(0,229,204,.35)">
         <div class="sec-title" style="color:var(--hdr)"><span class="sic">\u26D3\uFE0F</span> On-Chain Intelligence</div>
@@ -4876,8 +4813,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_5_html = f"""<!-- SECTION 6: XRP ECOSYSTEM -->
+    <!-- SECTION 6: XRP ECOSYSTEM -->
     <div class="eco-wrap">
       <div class="eco-head">
         <span class="gicon">\U0001F310</span>
@@ -4932,8 +4868,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_6_html = f"""<!-- SECTION 7: MAINSTREAM INTEGRATION MONITOR (title + tagline + legend key) -->
+    <!-- SECTION 7: MAINSTREAM INTEGRATION MONITOR (title + tagline + legend key) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0</span> Mainstream Integration Monitor</div>
       <div class="trk-tag">XRP is no longer knocking on the door of traditional finance \u2014 it's building new springboards for growth and utilization.</div>
@@ -4947,8 +4882,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_7_html = f"""<!-- SECTION 8: INSTITUTIONAL PARTNERSHIP TRACKER (separate section: 20 institutions, 5 rows of 4) -->
+    <!-- SECTION 8: INSTITUTIONAL PARTNERSHIP TRACKER (separate section: 20 institutions, 5 rows of 4) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3DB\uFE0F</span> Institutional Partnership Tracker</div>
       <div class="trk-grid">
@@ -4957,8 +4891,7 @@ def render_page(page="main"):
       <div id="trk-empty" class="trk-empty" style="display:none">No institutions in this category are currently available.</div>
     </div>
 
-    """
-    _sec_8_html = f"""<!-- SECTION 9: XRP × TRADITIONAL FINANCE — INTEGRATION TIMELINE -->
+    <!-- SECTION 9: XRP × TRADITIONAL FINANCE — INTEGRATION TIMELINE -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C5</span> XRP \u00D7 Traditional Finance \u2014 Integration Timeline</div>
       <div class="tl-wrap">
@@ -4969,8 +4902,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_9_html = f"""<!-- SECTION 10: TOP 20 XRP STORIES (two subsections) -->
+    <!-- SECTION 10: TOP 20 XRP STORIES (two subsections) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3C6</span> Top 20 XRP Stories</div>
       <div class="eco-sub-h" style="padding:0"><span style="font-size:17px">\U0001F4F0</span> Top 20 Current Stories</div>
@@ -4983,8 +4915,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_10_html = f"""<!-- SECTION 11: US INTELLIGENCE + GLOBAL PULSE (2-column, news-derived) -->
+    <!-- SECTION 11: US INTELLIGENCE + GLOBAL PULSE (2-column, news-derived) -->
     <div class="intel-grid">
       <div class="intel" style="border-color:rgba(3,177,252,.35)">
         <div class="intel-h">
@@ -5010,8 +4941,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_11_html = f"""<!-- SECTION 12: REGIONAL DISCOURSE (news-derived) -->
+    <!-- SECTION 12: REGIONAL DISCOURSE (news-derived) -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5FA\uFE0F</span> Regional Discourse</div>
       <div class="rd-grid">
@@ -5019,8 +4949,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_12_html = f"""<!-- SECTION 13: SIGNAL SCOREBOARD -->
+    <!-- SECTION 13: SIGNAL SCOREBOARD -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4E1</span> Signal Scoreboard</div>
       <div class="sb-grid">
@@ -5040,8 +4969,7 @@ def render_page(page="main"):
       <div class="sb-bar"><div class="sb-fill" style="width:{sb_bull_pct}%"></div></div>
     </div>
 
-    """
-    _sec_13_html = f"""<!-- SECTION 14: GLOBAL NEWS FEED + RIGHT RAIL -->
+    <!-- SECTION 14: GLOBAL NEWS FEED + RIGHT RAIL -->
     <div class="ledger-wrap">
       <div class="acct" style="border-color:rgba(3,177,252,.35);margin:0">
         <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5DE\uFE0F</span> Global News Feed &amp; Search</div>
@@ -5093,8 +5021,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_14_html = f"""<!-- SECTION 15: ANALYTICS LAB -->
+    <!-- SECTION 15: ANALYTICS LAB -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F52C</span> Analytics Lab</div>
       <div class="lab3">
@@ -5134,8 +5061,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_15_html = f"""<!-- SECTION 16: XRP COMPLETE LEADERBOARD -->
+    <!-- SECTION 16: XRP COMPLETE LEADERBOARD -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3C6</span> XRP Complete Leaderboard</div>
       <div class="trk-tag">Top sources, most active regions, and live intelligence \u2014 the XRP Complete rankings.</div>
@@ -5164,8 +5090,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_16_html = f"""<!-- SECTION 17: XRP INTELLIGENCE BRIEF (twice daily — AM 12:00 PM CST, PM 9:00 PM CST) -->
+    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (twice daily — AM 12:00 PM CST, PM 9:00 PM CST) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr);margin-bottom:10px"><span class="sic">\U0001F52E</span> XRP Intelligence Brief</div>
 
@@ -5193,8 +5118,7 @@ def render_page(page="main"):
     </div>
     <script type="application/json" id="brief-archive-data">{_archive_json}</script>
 
-    """
-    _sec_17_html = f"""<!-- SECTION 18: WORLD BRIEFING CLOCKS -->
+    <!-- SECTION 18: WORLD BRIEFING CLOCKS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F310</span> World Briefing Clocks</div>
       <div class="trk-tag" style="color:var(--tx)">Local time across major crypto hubs, with each city's 1st (12:00 PM CST) and 2nd (9:00 PM CST) briefing time \u2014 orange by day, gray by night.</div>
@@ -5203,8 +5127,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_18_html = f"""<!-- SECTION 19: UNIQUE DISPLAYS -->
+    <!-- SECTION 19: UNIQUE DISPLAYS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3A8</span> Unique Displays</div>
       <div class="ud-grid">
@@ -5230,8 +5153,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_19_html = f"""<!-- SECTION 20: LONGITUDINAL VALUE MARKERS -->
+    <!-- SECTION 20: LONGITUDINAL VALUE MARKERS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C8</span> Longitudinal Value Markers</div>
       <div class="trk-tag" style="color:var(--tx)">XRP/USD price performance across key windows.</div>
@@ -5240,8 +5162,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_20_html = f"""<!-- SECTION 21: REGIONAL NEWS ACTIVITY HEATMAP -->
+    <!-- SECTION 21: REGIONAL NEWS ACTIVITY HEATMAP -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F5FA\uFE0F</span> Regional News Activity Heatmap</div>
       <div class="trk-tag" style="color:var(--tx)">XRP stories by region today \u2014 brighter means more coverage.</div>
@@ -5250,8 +5171,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_21_html = f"""<!-- SECTION 22: SENTIMENT ENGINE -->
+    <!-- SECTION 22: SENTIMENT ENGINE -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F9E0</span> Sentiment Engine</div>
 
@@ -5291,8 +5211,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_22_html = f"""<!-- SECTION 23: COMPETITIVE BRIEFING -->
+    <!-- SECTION 23: COMPETITIVE BRIEFING -->
     <div class="acct" style="border-color:rgba(117,188,255,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\u2694\uFE0F</span> Competitive Briefing</div>
 
@@ -5335,8 +5254,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_23_html = f"""<!-- SECTION 24: RIPPLE EXECUTIVE TRACKER + XRPL DEV ACTIVITY -->
+    <!-- SECTION 24: RIPPLE EXECUTIVE TRACKER + XRPL DEV ACTIVITY -->
     <div class="ed-grid" style="margin:10px 0">
       <div class="ed-panel" style="border-color:rgba(255,153,0,.25)">
         <div class="ed-head">
@@ -5377,8 +5295,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_24_html = f"""<!-- SECTION 25: REGULATORY RADAR -->
+    <!-- SECTION 25: REGULATORY RADAR -->
     <div class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3DB\uFE0F</span> Regulatory Radar</div>
 
@@ -5414,8 +5331,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_25_html = f"""<!-- SECTION 26: CLARITY ACT TRACKER -->
+    <!-- SECTION 26: CLARITY ACT TRACKER -->
     <div class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F3DB\uFE0F</span> CLARITY Act Tracker</div>
@@ -5432,8 +5348,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_26_html = f"""<!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
+    <!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F310</span> Global XRP Enterprise &amp; Partnership Ledger</div>
@@ -5482,8 +5397,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_27_html = f"""<!-- SECTION 28: ADVANCED METRICS -->
+    <!-- SECTION 28: ADVANCED METRICS -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F52C</span> Advanced Metrics</div>
       <div class="trk-tag" style="color:var(--tx)">Technical indicators, order book depth, and reference specs \u2014 all computed from live, verifiable market data.</div>
@@ -5541,8 +5455,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_28_html = f"""<!-- SECTION 29: PRACTICAL TOOLS -->
+    <!-- SECTION 29: PRACTICAL TOOLS -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0\uFE0F</span> Practical Tools</div>
       <div class="pt-cols">
@@ -5725,8 +5638,8 @@ def render_page(page="main"):
     </div>
 
   <!-- MAIN -->
-    """
-    _sec_29_html = f"""<div class="acct" style="border-color:rgba(255,204,0,.4);margin:10px 0">
+    <!-- SECTION 30: XRP COMPLETE EXCLUSIVE INTELLIGENCE (flagship) -->
+    <div class="acct" style="border-color:rgba(255,204,0,.4);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F3C6</span> XRP Complete Exclusive Intelligence</div>
         <div style="font-size:12px;color:var(--tx);font-family:var(--mn);padding-top:4px">Live as of {flagship_ts}</div>
@@ -5798,8 +5711,7 @@ def render_page(page="main"):
     </div>
 
   <!-- REGULATORY & LEDGER WATCH (V66) -->
-    """
-    _sec_30_html = f"""<div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
+    <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F4E1</span> Regulatory &amp; Ledger Watch</div>
         <div style="font-size:12px;color:var(--tx);font-family:var(--mn);padding-top:4px">Updated: {rw_updated}</div>
@@ -5827,8 +5739,7 @@ def render_page(page="main"):
     </div>
 
   <!-- XRP COMMUNITY HUB (V67) -->
-    """
-    _sec_31_html = f"""<div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0 40px 0">
+    <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0 40px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F465</span> XRP Community Hub</div>
       </div>
@@ -5871,8 +5782,7 @@ def render_page(page="main"):
       </div>
     </div>
 
-    """
-    _sec_32_html = f"""<!-- SECTION 23: DOLLAR COST AVERAGING CALCULATOR (V109) -->
+    <!-- SECTION 23: DOLLAR COST AVERAGING CALCULATOR (V109) -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--tq)"><span class="sic">&#128176;</span> Dollar Cost Averaging Calculator</div>
       <div class="trk-tag" style="color:var(--tx)">Compare weekly vs. monthly contributions using {dca_days_available} days of real historical XRP prices \u2014 not a hypothetical curve.</div>
@@ -5907,16 +5817,14 @@ def render_page(page="main"):
       <div style="font-size:11px;color:var(--tx);margin-top:10px;font-style:italic">Simulated using real daily close prices over the available history window. Not financial advice \u2014 past performance does not predict future results.</div>
     </div>
 
-    """
-    _sec_33_html = f"""<!-- SECTION 24: 30-DAY HISTORICAL PRICE DATA (V109) -->
+    <!-- SECTION 24: 30-DAY HISTORICAL PRICE DATA (V109) -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#128197;</span> 30-Day Historical Price Data</div>
       <div class="trk-tag" style="color:var(--tx)">Daily OHLC, newest first. Same live Coinbase feed powering RSI and 52-week range above.</div>
       {hist30_html}
     </div>
 
-    """
-    _sec_34_html = f"""<!-- SECTION 25: NEWS MENTION VOLUME (V109) -->
+    <!-- SECTION 25: NEWS MENTION VOLUME (V109) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--yl)"><span class="sic">&#128240;</span> News Mention Volume <span style="font-weight:400;color:var(--tx);font-size:14px">({nmv_day_label})</span></div>
       <div class="trk-tag" style="color:var(--tx)">Real story counts across the {hdr_feeds_total} RSS sources this site already tracks \u2014 never estimated. Locks in at 00:15 UTC each day.</div>
@@ -5933,13 +5841,73 @@ def render_page(page="main"):
       <div>{nmv_cat_html}</div>
     </div>
 
-    
-
-  """
-    _footer_html = f"""
-
   </div>
-<!-- FLOATING RETURN / BACK-TO-TOP -->
+
+    <script>
+      window.__DCA_HIST_DATA__ = {dca_history_json};
+function dcaCalculate() {{
+  var weeklyAmt = parseFloat(document.getElementById('dca-weekly').value) || 0;
+  var monthlyAmt = parseFloat(document.getElementById('dca-monthly').value) || 0;
+  var hist = window.__DCA_HIST_DATA__ || [];
+  if (hist.length < 2) return;
+
+  var currentPrice = hist[hist.length - 1].c;
+  var startT = hist[0].t;
+
+  function priceNear(targetT) {{
+    var best = hist[0];
+    for (var i = 0; i < hist.length; i++) {{
+      if (hist[i].t <= targetT) {{ best = hist[i]; }} else {{ break; }}
+    }}
+    return best.c;
+  }}
+
+  function simulate(amount, intervalDays) {{
+    if (amount <= 0) return {{ invested: 0, xrp: 0 }};
+    var invested = 0, xrp = 0;
+    var stepSeconds = intervalDays * 86400;
+    var t = startT;
+    var lastT = hist[hist.length - 1].t;
+    while (t <= lastT) {{
+      var p = priceNear(t);
+      if (p > 0) {{ xrp += amount / p; invested += amount; }}
+      t += stepSeconds;
+    }}
+    return {{ invested: invested, xrp: xrp }};
+  }}
+
+  var weekly = simulate(weeklyAmt, 7);
+  var monthly = simulate(monthlyAmt, 30);
+
+  function render(prefix, result) {{
+    var value = result.xrp * currentPrice;
+    var ret = value - result.invested;
+    var retPct = result.invested > 0 ? (ret / result.invested * 100) : 0;
+    var avgCost = result.xrp > 0 ? (result.invested / result.xrp) : 0;
+    document.getElementById(prefix + '-invested').textContent = '$' + result.invested.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+    document.getElementById(prefix + '-xrp').textContent = result.xrp.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' XRP';
+    document.getElementById(prefix + '-avgcost').textContent = '$' + avgCost.toFixed(4);
+    document.getElementById(prefix + '-value').textContent = '$' + value.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+    var retEl = document.getElementById(prefix + '-return');
+    var sign = ret >= 0 ? '+' : '';
+    retEl.textContent = sign + '$' + ret.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' (' + sign + retPct.toFixed(2) + '%)';
+    retEl.style.color = ret >= 0 ? 'var(--gr)' : 'var(--rd)';
+  }}
+
+  render('dca-w', weekly);
+  render('dca-m', monthly);
+}}
+
+document.addEventListener('DOMContentLoaded', function() {{
+  var wInput = document.getElementById('dca-weekly');
+  var mInput = document.getElementById('dca-monthly');
+  if (wInput) wInput.addEventListener('input', dcaCalculate);
+  if (mInput) mInput.addEventListener('input', dcaCalculate);
+  dcaCalculate();
+}});
+    </script>
+
+  <!-- FLOATING RETURN / BACK-TO-TOP -->
   <button id="back-to-top" title="Return to XRP Complete" aria-label="Return to XRP Complete">&#8679;</button>
 
   <!-- FOOTER -->
@@ -6301,81 +6269,7 @@ def render_page(page="main"):
   </script>
 
 </body>
-</html>
-    <script>
-      window.__DCA_HIST_DATA__ = {dca_history_json};
-function dcaCalculate() {{
-  var weeklyAmt = parseFloat(document.getElementById('dca-weekly').value) || 0;
-  var monthlyAmt = parseFloat(document.getElementById('dca-monthly').value) || 0;
-  var hist = window.__DCA_HIST_DATA__ || [];
-  if (hist.length < 2) return;
-
-  var currentPrice = hist[hist.length - 1].c;
-  var startT = hist[0].t;
-
-  function priceNear(targetT) {{
-    var best = hist[0];
-    for (var i = 0; i < hist.length; i++) {{
-      if (hist[i].t <= targetT) {{ best = hist[i]; }} else {{ break; }}
-    }}
-    return best.c;
-  }}
-
-  function simulate(amount, intervalDays) {{
-    if (amount <= 0) return {{ invested: 0, xrp: 0 }};
-    var invested = 0, xrp = 0;
-    var stepSeconds = intervalDays * 86400;
-    var t = startT;
-    var lastT = hist[hist.length - 1].t;
-    while (t <= lastT) {{
-      var p = priceNear(t);
-      if (p > 0) {{ xrp += amount / p; invested += amount; }}
-      t += stepSeconds;
-    }}
-    return {{ invested: invested, xrp: xrp }};
-  }}
-
-  var weekly = simulate(weeklyAmt, 7);
-  var monthly = simulate(monthlyAmt, 30);
-
-  function render(prefix, result) {{
-    var value = result.xrp * currentPrice;
-    var ret = value - result.invested;
-    var retPct = result.invested > 0 ? (ret / result.invested * 100) : 0;
-    var avgCost = result.xrp > 0 ? (result.invested / result.xrp) : 0;
-    document.getElementById(prefix + '-invested').textContent = '$' + result.invested.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
-    document.getElementById(prefix + '-xrp').textContent = result.xrp.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' XRP';
-    document.getElementById(prefix + '-avgcost').textContent = '$' + avgCost.toFixed(4);
-    document.getElementById(prefix + '-value').textContent = '$' + value.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
-    var retEl = document.getElementById(prefix + '-return');
-    var sign = ret >= 0 ? '+' : '';
-    retEl.textContent = sign + '$' + ret.toLocaleString(undefined, {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) + ' (' + sign + retPct.toFixed(2) + '%)';
-    retEl.style.color = ret >= 0 ? 'var(--gr)' : 'var(--rd)';
-  }}
-
-  render('dca-w', weekly);
-  render('dca-m', monthly);
-}}
-
-document.addEventListener('DOMContentLoaded', function() {{
-  var wInput = document.getElementById('dca-weekly');
-  var mInput = document.getElementById('dca-monthly');
-  if (wInput) wInput.addEventListener('input', dcaCalculate);
-  if (mInput) mInput.addEventListener('input', dcaCalculate);
-  dcaCalculate();
-}});
-    </script>
-"""
-    _page_sections = {
-        "main": _sec_0_html + _sec_1_html + _sec_2_html + _sec_3_html + _sec_4_html + _sec_9_html + _sec_12_html + _sec_25_html + _sec_28_html + _sec_29_html,
-        "markets": _sec_14_html + _sec_17_html + _sec_18_html + _sec_19_html + _sec_27_html + _sec_32_html + _sec_33_html,
-        "news": _sec_10_html + _sec_11_html + _sec_13_html + _sec_16_html + _sec_20_html + _sec_21_html + _sec_34_html,
-        "institutional": _sec_5_html + _sec_6_html + _sec_7_html + _sec_8_html + _sec_22_html + _sec_26_html,
-        "regulatory": _sec_23_html + _sec_24_html + _sec_30_html,
-        "community": _sec_15_html + _sec_31_html,
-    }
-    return _header_html + _page_sections.get(page, _page_sections["main"]) + _footer_html
-
+</html>"""
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -6383,32 +6277,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 # ─────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
-    return Response(replace_flags_with_svg(render_page("main")), mimetype="text/html")
-
-
-@app.route("/markets")
-def markets_page():
-    return Response(replace_flags_with_svg(render_page("markets")), mimetype="text/html")
-
-
-@app.route("/news")
-def news_page():
-    return Response(replace_flags_with_svg(render_page("news")), mimetype="text/html")
-
-
-@app.route("/institutional")
-def institutional_page():
-    return Response(replace_flags_with_svg(render_page("institutional")), mimetype="text/html")
-
-
-@app.route("/regulatory")
-def regulatory_page():
-    return Response(replace_flags_with_svg(render_page("regulatory")), mimetype="text/html")
-
-
-@app.route("/community")
-def community_page():
-    return Response(replace_flags_with_svg(render_page("community")), mimetype="text/html")
+    return Response(replace_flags_with_svg(render_page()), mimetype="text/html")
 
 
 @app.route("/about")
