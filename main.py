@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "130"
+APP_VERSION = "131"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -6768,7 +6768,7 @@ def render_page(page="main"):
         <div class="icon"><img src="/logo.jpg" alt="XRP Complete" width="47" height="100"></div>
         <div>
           <div class="title">{APP_NAME}</div>
-          <div class="sub" style="font-size:17px;color:var(--hdr);letter-spacing:1.5px">The <i>NEW</i> XRP Intelligence Standard</div>
+          <div class="sub" style="font-size:17px;color:var(--hdr);letter-spacing:1.5px;font-weight:700">The <i>NEW</i> XRP Intelligence Standard</div>
           <div class="sub" style="font-size:15px;color:var(--br);letter-spacing:1.2px">Every Signal. Every Region. Every Hour.</div>
           <div class="sub" style="font-size:15px;color:var(--tx);letter-spacing:1px">306+ sources over 8 global regions signaling 24/7</div>
         </div>
