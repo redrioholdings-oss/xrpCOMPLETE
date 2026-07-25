@@ -5,6 +5,27 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V127 changes:
+  1. Final dimensions locked: 250px wide x 70px tall (height:70px,
+     width:250px). Supersedes V126's 170x70.
+
+V126 changes:
+  1. Correction: confirmed final dimensions are 70px tall x 170px wide
+     (height:70px, width:170px) — reverting V125's swap back to V124's
+     values, now stated explicitly to avoid further ambiguity.
+
+V125 changes:
+  1. Correction: V124 transposed the requested dimensions (set width:170px,
+     height:70px). Fixed to the dimensions as given — width:70px,
+     height:170px.
+
+V124 changes:
+  1. Correction: V123 sized the blog ad to the border-alignment rule (full
+     column width). Clarified the sample image was for style/color match
+     only — actual size is fixed at 170x70px. Ad now rendered at that fixed
+     box (object-fit:contain, so the square source image scales down without
+     stretching/distortion rather than being squeezed to fit).
+
 V123 changes:
   1. Header BLOG button replaced with a clickable blog advertisement image
      (Template D v2 — Full-Bleed ad graphic, provided by Rich). Still links
@@ -134,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "123"
+APP_VERSION = "127"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -6841,8 +6862,8 @@ def render_page(page="main"):
           <span style="font-size:12px;color:var(--tx);margin-left:8px;letter-spacing:0.5px">v{APP_VERSION}</span>
         </div>
         <div class="sub" style="font-size:15px;color:var(--gr);letter-spacing:1px">\u25CF {hdr_feeds_active}/{hdr_feeds_total} feeds scanned</div>
-        <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:block;width:100%">
-          <img src="/blog_ad.png" alt="XRP Complete Blog" style="display:block;width:100%;height:auto">
+        <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:block;width:250px;height:70px">
+          <img src="/blog_ad.png" alt="XRP Complete Blog" style="display:block;width:250px;height:70px;object-fit:contain">
         </a>
       </div>
     </div>
