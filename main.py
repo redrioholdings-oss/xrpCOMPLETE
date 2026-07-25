@@ -121,7 +121,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "109"
+APP_VERSION = "119"
 APP_NAME    = "XRP Complete"
 TAGLINE     = "The NEW XRP Intelligence Standard"
 COPYRIGHT   = "\u00A9\uFE0F Copyright 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally."
@@ -3318,6 +3318,353 @@ def replace_flags_with_svg(html_text):
     return _FLAG_EMOJI_RE.sub(repl, html_text)
 
 
+
+# ═════════════════════════════════════════════════════════════════════
+# V116 — REGULATORY PAGE SECTIONS (six, new this version)
+#
+# Five of the six run on curated data maintained by hand. That data lives
+# in the plainly labelled tuples directly below each section's function so
+# it can be found and edited without reading any surrounding logic.
+#
+# REG_LAST_REVIEWED is displayed on every one of the six sections. Change
+# it whenever the curated data below is updated.
+#
+# The sixth, the Regulator Voice Tracker, is computed. It reads the news
+# pool the existing feed cycle already fetches (NEWS["pool"]). It adds no
+# feeds and makes no network calls of its own, so it cannot slow or break
+# the existing fetch path.
+#
+# Palette for this page: blue (--hdr), turquoise (--tq), orange (--or),
+# white and the neutral text vars. No red, no pink.
+# ═════════════════════════════════════════════════════════════════════
+
+REG_LAST_REVIEWED = "July 24, 2026"
+
+_RG_BLUE = "var(--hdr)"
+_RG_TURQ = "var(--tq)"
+_RG_ORNG = "var(--or)"
+_RG_ROTATION = (_RG_BLUE, _RG_TURQ, _RG_ORNG)
+
+
+def _rg_reviewed():
+    return ('<div class="rg-note">Curated data \u00b7 last reviewed '
+            + REG_LAST_REVIEWED + '</div>')
+
+
+def _rg_head(icon, title, colour, sub):
+    return ('<div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">'
+            '<div class="sec-title" style="color:' + colour + '">'
+            '<span class="sic">' + icon + '</span> ' + title + '</div>'
+            '<div class="rg-sub">' + sub + '</div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 1. GLOBAL REGULATORY STATUS MAP
+#    (jurisdiction, posture, accent, one-line status)
+#    Posture vocabulary: COMPREHENSIVE / DEVELOPING / RESTRICTIVE
+# ─────────────────────────────────────────────────────────────────────
+RG_JURISDICTIONS = (
+    ("United States",  "DEVELOPING",    _RG_ORNG,
+     "Spot XRP exchange-traded products trade on US venues. Comprehensive market-structure "
+     "legislation remains before the Senate."),
+    ("European Union", "COMPREHENSIVE", _RG_BLUE,
+     "MiCA applies in full across member states. XRP is treated as a crypto-asset that is "
+     "neither an e-money token nor an asset-referenced token."),
+    ("United Kingdom", "DEVELOPING",    _RG_ORNG,
+     "FCA cryptoasset regime phasing in, with authorisation and a financial-promotions "
+     "regime already live."),
+    ("Japan",          "COMPREHENSIVE", _RG_BLUE,
+     "FSA registration regime long established. XRP has been listed on registered domestic "
+     "exchanges for years."),
+    ("Singapore",      "COMPREHENSIVE", _RG_BLUE,
+     "MAS licenses digital payment token services under the Payment Services Act."),
+    ("UAE \u2014 Dubai",    "COMPREHENSIVE", _RG_BLUE,
+     "VARA operates a dedicated virtual-asset regime; Ripple holds a DFSA licence in the DIFC."),
+    ("Switzerland",    "COMPREHENSIVE", _RG_BLUE,
+     "FINMA supervises under the DLT Act, one of the earliest complete frameworks."),
+    ("Hong Kong",      "COMPREHENSIVE", _RG_BLUE,
+     "SFC licenses trading platforms; a separate stablecoin regime sits alongside it."),
+    ("Canada",         "COMPREHENSIVE", _RG_BLUE,
+     "CSA requires platform registration and pre-registration undertakings."),
+    ("Brazil",         "DEVELOPING",    _RG_ORNG,
+     "Central Bank has been building out the VASP authorisation framework."),
+    ("South Korea",    "COMPREHENSIVE", _RG_BLUE,
+     "Virtual Asset User Protection Act in force, with strict exchange and custody duties."),
+    ("Australia",      "DEVELOPING",    _RG_ORNG,
+     "Treasury's digital-asset platform licensing reform still working through Parliament."),
+    ("India",          "RESTRICTIVE",   _RG_TURQ,
+     "Heavy transaction tax and no comprehensive framework, though trading is not banned."),
+    ("China",          "RESTRICTIVE",   _RG_TURQ,
+     "Trading and related services prohibited on the mainland. Hong Kong is separate."),
+)
+
+
+def rg_status_map_html():
+    cards = []
+    for name, posture, colour, note in RG_JURISDICTIONS:
+        cards.append(
+            '<div class="rg-j" style="border-left-color:' + colour + '">'
+            '<div class="rg-j-n">' + name + '</div>'
+            '<div class="rg-j-s" style="color:' + colour + '">' + posture + '</div>'
+            '<div class="rg-j-d">' + note + '</div>'
+            '</div>')
+    return (_rg_head("\U0001F30D", "Global Regulatory Status Map", _RG_BLUE,
+                     "Where XRP and the wider digital-asset market stand jurisdiction by "
+                     "jurisdiction. Posture describes the framework in place, not a view on "
+                     "any asset.")
+            + '<div class="rg-map">' + "".join(cards) + '</div>'
+            + _rg_reviewed() + '</div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2. ETF & PRODUCT APPROVAL BOARD
+#    (product, issuer, venue/market, status, accent)
+# ─────────────────────────────────────────────────────────────────────
+RG_PRODUCTS = (
+    ("Spot XRP ETF",            "Multiple US issuers", "US exchanges",  "TRADING",  _RG_BLUE),
+    ("XRP futures ETF",         "Multiple US issuers", "US exchanges",  "TRADING",  _RG_BLUE),
+    ("XRP ETP",                 "European issuers",    "SIX / Xetra",   "TRADING",  _RG_BLUE),
+    ("XRP ETP",                 "Canadian issuers",    "TSX",           "TRADING",  _RG_BLUE),
+    ("Further US spot filings", "Additional issuers",  "US exchanges",  "PENDING",  _RG_ORNG),
+    ("Staking / yield wrappers","Various",             "Various",       "PENDING",  _RG_ORNG),
+)
+
+
+def rg_product_board_html():
+    rows = []
+    for prod, issuer, venue, status, colour in RG_PRODUCTS:
+        rows.append(
+            '<tr><td><b>' + prod + '</b></td><td>' + issuer + '</td><td>' + venue + '</td>'
+            '<td><span class="rg-pill" style="color:' + colour + '">' + status + '</span></td></tr>')
+    return (_rg_head("\U0001F4CB", "ETF &amp; Product Approval Board", _RG_TURQ,
+                     "Regulated XRP investment products by category and status. Issuer-level "
+                     "detail is deliberately generalised here so this board stays accurate "
+                     "between reviews.")
+            + '<table class="rg-tbl"><thead><tr><th>Product</th><th>Issuer</th>'
+              '<th>Market</th><th>Status</th></tr></thead><tbody>'
+            + "".join(rows) + '</tbody></table>'
+            + '<div class="rg-flag">Listing status is not an endorsement and says nothing '
+              'about whether any product is suitable for you. Not financial advice.</div>'
+            + _rg_reviewed() + '</div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 3. ENFORCEMENT & LITIGATION DOCKET
+#    (matter, forum, posture, accent, note)
+# ─────────────────────────────────────────────────────────────────────
+RG_DOCKET = (
+    ("SEC v. Ripple Labs", "S.D.N.Y. / 2d Cir.", "CLOSED", _RG_BLUE,
+     "The long-running action ended in 2025. The 2023 summary-judgment holding \u2014 that "
+     "programmatic exchange sales did not meet the Howey test while institutional sales did "
+     "\u2014 stands as the operative outcome, together with a civil penalty."),
+    ("Ripple \u2014 OCC charter", "Office of the Comptroller", "PENDING", _RG_ORNG,
+     "Ripple's national trust bank application remains a live regulatory question rather "
+     "than a litigation matter, but it sits on the same critical path for institutional "
+     "access."),
+    ("Private class actions", "US federal and state", "LARGELY RESOLVED", _RG_BLUE,
+     "The principal investor class litigation against Ripple has been resolved. Residual "
+     "filings appear periodically and are tracked here as they arise."),
+    ("Exchange-side matters", "Various", "ONGOING", _RG_ORNG,
+     "Enforcement aimed at trading venues rather than at XRP itself can still affect XRP "
+     "market access, so it is monitored on this page."),
+)
+
+
+def rg_docket_html():
+    rows = []
+    for matter, forum, posture, colour, note in RG_DOCKET:
+        rows.append(
+            '<tr><td><b>' + matter + '</b><div style="font-size:12px;color:var(--tx);'
+            'margin-top:4px;line-height:1.5">' + note + '</div></td>'
+            '<td>' + forum + '</td>'
+            '<td><span class="rg-pill" style="color:' + colour + '">' + posture + '</span></td></tr>')
+    return (_rg_head("\u2696\uFE0F", "Enforcement &amp; Litigation Docket", _RG_ORNG,
+                     "Matters that shape how XRP may be sold, held and listed. Summaries are "
+                     "plain-language and are not legal advice.")
+            + '<table class="rg-tbl"><thead><tr><th>Matter</th><th>Forum</th>'
+              '<th>Posture</th></tr></thead><tbody>'
+            + "".join(rows) + '</tbody></table>'
+            + _rg_reviewed() + '</div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 4. RULEMAKING & LEGISLATIVE CALENDAR
+#    (when, what, detail)
+# ─────────────────────────────────────────────────────────────────────
+RG_CALENDAR = (
+    ("Live now", "CLARITY Act \u2014 Senate",
+     "Market-structure legislation passed the House and remains before the Senate. The "
+     "spot-market jurisdictional split between the SEC and the CFTC is the provision that "
+     "matters most for XRP."),
+    ("Live now", "GENIUS Act implementation",
+     "Payment-stablecoin rulemaking by the federal banking agencies and Treasury. Relevant "
+     "to RLUSD. XRP is not a stablecoin and is not covered by this framework."),
+    ("Live now", "SEC rulemaking agenda",
+     "Custody, exchange definitions and disclosure items that would apply across "
+     "digital-asset markets."),
+    ("Live now", "OCC charter decisions",
+     "National trust bank applications from digital-asset firms, Ripple's among them."),
+    ("Rolling",  "Federal Register comment windows",
+     "Comment deadlines open and close continuously. The Regulatory &amp; Ledger Watch "
+     "section on this page reads the Federal Register directly and will show live items."),
+    ("Rolling",  "EU \u2014 MiCA supervisory guidance",
+     "ESMA and EBA continue issuing technical standards and guidance under the framework "
+     "already in force."),
+)
+
+
+def rg_calendar_html():
+    rows = []
+    for when, what, detail in RG_CALENDAR:
+        rows.append(
+            '<div class="rg-c"><div class="rg-c-d">' + when + '</div>'
+            '<div><div class="rg-c-t">' + what + '</div>'
+            '<div class="rg-c-b">' + detail + '</div></div></div>')
+    return (_rg_head("\U0001F5D3\uFE0F", "Rulemaking &amp; Legislative Calendar", _RG_BLUE,
+                     "What is actually moving, and where. Dated deadlines are deliberately "
+                     "avoided here because they slip; live dated items surface in Regulatory "
+                     "&amp; Ledger Watch below.")
+            + '<div class="rg-cal">' + "".join(rows) + '</div>'
+            + _rg_reviewed() + '</div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. REGULATOR VOICE TRACKER  (computed — no new feeds, no new calls)
+#    (display name, matching keywords)
+# ─────────────────────────────────────────────────────────────────────
+RG_VOICES = (
+    ("SEC",           ("sec ", " sec", "securities and exchange")),
+    ("CFTC",          ("cftc", "commodity futures")),
+    ("US Treasury",   ("treasury",)),
+    ("Federal Reserve", ("federal reserve", "the fed ", "fomc")),
+    ("OCC",           ("occ ", "comptroller of the currency")),
+    ("FDIC",          ("fdic",)),
+    ("US Congress",   ("congress", "senate", "house committee", "lawmaker")),
+    ("ESMA / EU",     ("esma", "european commission", "mica", "european union")),
+    ("FCA / UK",      ("fca", "bank of england", "united kingdom", " uk ")),
+    ("MAS Singapore", ("mas ", "monetary authority of singapore")),
+    ("FSA Japan",     ("fsa", "japan financial services")),
+    ("VARA / UAE",    ("vara", "dubai", "uae")),
+    ("BIS / FSB",     ("bis ", "bank for international settlements", "financial stability board")),
+    ("IMF",           ("imf", "international monetary fund")),
+)
+
+
+def rg_voice_tracker_html():
+    """Reads the pool the existing news cycle already fetched. Never raises."""
+    try:
+        pool = NEWS.get("pool", []) or []
+    except Exception:
+        pool = []
+
+    cards = []
+    idx = 0
+    for name, keys in RG_VOICES:
+        hits = []
+        for s in pool:
+            try:
+                blob = ((s.get("title") or "") + " " + (s.get("source") or "")).lower()
+            except Exception:
+                continue
+            if any(k in blob for k in keys):
+                hits.append(s)
+        colour = _RG_ROTATION[idx % len(_RG_ROTATION)]
+        idx += 1
+
+        if hits:
+            try:
+                hits.sort(key=lambda s: s.get("dt"), reverse=True)
+            except Exception:
+                pass
+            top = hits[0]
+            title = (top.get("title") or "").strip()
+            if len(title) > 150:
+                title = title[:147] + "\u2026"
+            link = top.get("link") or ""
+            src = top.get("source") or ""
+            body = ('<a href="' + link + '" target="_blank" rel="noopener">' + title + '</a>'
+                    ) if link else title
+            sub = '<div class="rg-v-s">' + src + '</div>' if src else ""
+            count = str(len(hits)) + (" mention" if len(hits) == 1 else " mentions")
+        else:
+            body = ('<span style="color:var(--tx)">No mention in the current news cycle.</span>')
+            sub = ""
+            count = "0 mentions"
+
+        cards.append(
+            '<div class="rg-v" style="border-left:3px solid ' + colour + '">'
+            '<div class="rg-v-h">'
+            '<span class="rg-v-n" style="color:' + colour + '">' + name + '</span>'
+            '<span class="rg-v-c">' + count + '</span></div>'
+            '<div class="rg-v-q">' + body + '</div>' + sub + '</div>')
+
+    return (_rg_head("\U0001F5E3\uFE0F", "Regulator Voice Tracker", _RG_TURQ,
+                     "Which regulators and legislatures are actually being heard from right "
+                     "now, measured against the same news pool this site already collects. "
+                     "Counts cover the current cycle only, so a zero means quiet today, not "
+                     "absent from the debate.")
+            + '<div class="rg-vt">' + "".join(cards) + '</div>'
+            + '<div class="rg-note">Computed live from the existing feed cycle \u00b7 '
+              'no additional sources</div></div>')
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 6. STABLECOIN REGULATORY OVERLAY
+#    (instrument, issuer, regime, note)
+# ─────────────────────────────────────────────────────────────────────
+RG_STABLES = (
+    ("RLUSD", "Ripple",
+     "US payment-stablecoin framework; NYDFS-supervised issuance",
+     "Ripple's own dollar stablecoin. Reserve-backed and redeemable at par by design. This "
+     "is the Ripple-issued instrument that stablecoin rules actually apply to."),
+    ("USDC", "Circle",
+     "US payment-stablecoin framework; EU e-money token under MiCA",
+     "Widely used in XRPL and cross-chain liquidity routing."),
+    ("USDT", "Tether",
+     "Varies by jurisdiction; constrained in the EU under MiCA",
+     "The largest stablecoin by supply, with a different compliance posture region to region."),
+    ("EURC and other euro tokens", "Various",
+     "EU e-money tokens under MiCA",
+     "Euro-denominated tokens sit squarely inside the MiCA e-money category."),
+)
+
+
+def rg_stablecoin_overlay_html():
+    cards = []
+    for name, issuer, regime, note in RG_STABLES:
+        cards.append(
+            '<div class="rg-s"><div class="rg-s-n">' + name + '</div>'
+            '<div class="rg-s-i">' + issuer + '</div>'
+            '<div class="rg-s-d"><b style="color:var(--br)">Regime:</b> ' + regime + '<br>' + note
+            + '</div></div>')
+    return (_rg_head("\U0001F517", "Stablecoin Regulatory Overlay", _RG_ORNG,
+                     "Stablecoin rules move separately from the rest of digital-asset "
+                     "regulation, and they increasingly govern the settlement instruments "
+                     "that ride on the XRP Ledger. This is where those two tracks meet.")
+            + '<div class="rg-sc">' + "".join(cards) + '</div>'
+            + '<div class="rg-flag"><b style="color:var(--or)">XRP is not a stablecoin.</b> '
+              'XRP is a floating-price digital asset with no peg, no issuer redemption promise '
+              'and no reserve backing. RLUSD is Ripple\'s stablecoin. Payment-stablecoin '
+              'legislation such as the GENIUS Act governs instruments like RLUSD \u2014 it does '
+              'not govern XRP. Conflating the two is the single most common error in coverage '
+              'of this topic.</div>'
+            + _rg_reviewed() + '</div>')
+
+
+def regulatory_sections():
+    """All six new Regulatory sections, in the order Rich approved them.
+    Any single failure degrades to a visible notice rather than a broken page."""
+    out = []
+    for fn in (rg_status_map_html, rg_product_board_html, rg_docket_html,
+               rg_calendar_html, rg_voice_tracker_html, rg_stablecoin_overlay_html):
+        try:
+            out.append(fn())
+        except Exception:
+            out.append('<div class="acct" style="border-color:rgba(204,95,0,.35);margin:10px 0">'
+                       '<div class="rg-sub">This section is temporarily unavailable.</div></div>')
+    return "".join(out)
+
+
 def render_page():
     checks, passed, total, overall = run_preflight()
     overall_color = "#48ff82" if overall == "PASS" else "#ff4060"
@@ -3775,6 +4122,8 @@ def render_page():
             f'<span class="pf-row-detail">{detail}</span>'
             '</div>'
         )
+
+    _regnew = regulatory_sections()
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -4576,6 +4925,47 @@ def render_page():
     .w{{ padding:6px 8px; }}
     .sic{{ font-size:15px; }}
   }}
+
+  /* ══ V119: REGULATORY SECTIONS ══ blue / turquoise / orange only */
+  .rg-note{{ font-size:12px; color:var(--tx); font-family:var(--mn); letter-spacing:.5px; margin-top:10px; }}
+  .rg-sub{{ font-size:12px; color:var(--tx); line-height:1.6; margin-bottom:14px; }}
+  .rg-map{{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }}
+  .rg-j{{ background:var(--s1); border:1px solid var(--b); border-left-width:4px; border-radius:8px; padding:11px 13px; }}
+  .rg-j-n{{ font-weight:800; font-size:14px; color:var(--br); margin-bottom:3px; }}
+  .rg-j-s{{ font-family:var(--mn); font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; }}
+  .rg-j-d{{ font-size:12px; color:var(--tx); line-height:1.5; margin-top:5px; }}
+  .rg-tbl{{ width:100%; border-collapse:collapse; font-size:13px; }}
+  .rg-tbl th{{ text-align:left; font-family:var(--mn); font-size:11px; letter-spacing:1px;
+               text-transform:uppercase; color:var(--tx); border-bottom:1px solid var(--b); padding:8px 10px; }}
+  .rg-tbl td{{ border-bottom:1px solid var(--b); padding:9px 10px; color:var(--br); vertical-align:top; }}
+  .rg-tbl tr:last-child td{{ border-bottom:none; }}
+  .rg-pill{{ font-family:var(--mn); font-size:11px; font-weight:800; letter-spacing:.8px;
+             text-transform:uppercase; padding:3px 9px; border-radius:20px; border:1px solid currentColor;
+             white-space:nowrap; display:inline-block; }}
+  .rg-cal{{ display:flex; flex-direction:column; gap:9px; }}
+  .rg-c{{ display:flex; gap:13px; align-items:flex-start; background:var(--s1);
+          border:1px solid var(--b); border-radius:8px; padding:11px 13px; }}
+  .rg-c-d{{ font-family:var(--mn); font-size:12px; font-weight:800; color:var(--tq);
+            min-width:96px; letter-spacing:.5px; }}
+  .rg-c-t{{ font-weight:700; font-size:13px; color:var(--br); }}
+  .rg-c-b{{ font-size:12px; color:var(--tx); line-height:1.5; margin-top:3px; }}
+  .rg-vt{{ display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:10px; }}
+  .rg-v{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:11px 13px; }}
+  .rg-v-h{{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:5px; }}
+  .rg-v-n{{ font-family:var(--mn); font-size:13px; font-weight:800; letter-spacing:1px; }}
+  .rg-v-c{{ font-family:var(--mn); font-size:11px; color:var(--tx); white-space:nowrap; }}
+  .rg-v-q{{ font-size:12px; color:var(--br); line-height:1.5; }}
+  .rg-v-q a{{ color:var(--br); text-decoration:none; }}
+  .rg-v-q a:hover{{ color:var(--hdr); text-decoration:underline; }}
+  .rg-v-s{{ font-size:11px; color:var(--tx); font-family:var(--mn); margin-top:4px; }}
+  .rg-sc{{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }}
+  .rg-s{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:12px 14px; }}
+  .rg-s-n{{ font-weight:800; font-size:14px; color:var(--br); }}
+  .rg-s-i{{ font-family:var(--mn); font-size:11px; color:var(--tq); letter-spacing:.8px; margin:3px 0 6px; }}
+  .rg-s-d{{ font-size:12px; color:var(--tx); line-height:1.55; }}
+  .rg-flag{{ border:1px solid var(--or); border-radius:8px; padding:11px 14px; margin-top:12px;
+             font-size:12px; color:var(--br); line-height:1.6; background:rgba(204,95,0,.07); }}
+  @media(max-width:480px){{ .rg-c{{ flex-direction:column; gap:4px; }} .rg-tbl{{ font-size:12px; }} }}
 </style>
 </head>
 <body id="top">
@@ -5737,6 +6127,9 @@ def render_page():
         </div>
       </div>
     </div>
+
+  <!-- V119: SIX REGULATORY SECTIONS -->
+    {_regnew}
 
   <!-- XRP COMMUNITY HUB (V67) -->
     <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0 40px 0">
