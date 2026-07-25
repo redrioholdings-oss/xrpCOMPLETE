@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "128"
+APP_VERSION = "129"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -365,11 +365,15 @@ LOGO_B64 = (
 )
 LOGO_BYTES = base64.b64decode(LOGO_B64)
 
-# BLOG AD (V128) - header advertisement for XRP Complete Blog. Purpose-built
+# BLOG AD (V128/V129) - header advertisement for XRP Complete Blog. Purpose-built
 # 250x70 banner (embedded at 500x140 for retina crispness, displayed at
 # 250x70): satellite photo left, "XRP COMPLETE BLOG" wordmark, tagline,
 # domain, Template D palette. Replaces the V123 square graphic that was
 # letterboxed inside the 250x70 slot. Served at /blog_ad.png.
+# V129: the <img> src now carries ?v={APP_VERSION}, so every version bump
+# produces a distinct URL. A browser holding a cached copy of the previous
+# image physically cannot serve it for the new URL, which removes stale
+# caching as a possible cause on this and all future ad swaps.
 BLOG_AD_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAfQAAACMCAYAAACK0FuSAAEAAElEQVR4nOz9d7wtWVnnj7/XWpV2PPnc3PfezhEaaFKTEQElSk6C"
     "KOoY4OfojH4dnd8483UcdZI5oPhCRFKTkwFQESRJaGg69+2+OZ28c1Wt8P1jVdXe54a+txFGXt/veV59+5xTu/aqVVV712c9n+fz"
@@ -6282,7 +6286,7 @@ def render_page(page="main"):
         </div>
         <div class="sub" style="font-size:15px;color:var(--gr);letter-spacing:1px">\u25CF {hdr_feeds_active}/{hdr_feeds_total} feeds scanned</div>
         <a href="https://xrpcompleteblog.com" target="_blank" rel="noopener" style="display:block;width:250px;height:70px">
-          <img src="/blog_ad.png" alt="XRP Complete Blog" style="display:block;width:250px;height:70px;object-fit:contain">
+          <img src="/blog_ad.png?v={APP_VERSION}" alt="XRP Complete Blog" style="display:block;width:250px;height:70px;object-fit:contain">
         </a>
       </div>
     </div>
