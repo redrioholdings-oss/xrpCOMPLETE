@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "138"
+APP_VERSION = "139"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -6966,6 +6966,16 @@ def render_page(page="main"):
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
 
+  /* V139: About page content, now on the shared site template */
+  .about-body h1{{ color:var(--hdr); font-size:30px; margin:0 0 8px; }}
+  .about-body h2{{ color:var(--tq); font-size:19px; margin:28px 0 10px; border-bottom:1px solid var(--b); padding-bottom:7px; }}
+  .about-body p{{ font-size:15px; color:var(--br); margin:0 0 13px; line-height:1.7; }}
+  .about-body .tagline{{ color:var(--tx); font-size:15px; margin-bottom:26px; }}
+  .about-body .contact-box{{ background:var(--s2); border:1px solid var(--b); border-radius:9px; padding:14px 16px; margin:10px 0; }}
+  .about-body .fine-print{{ font-size:12.5px; color:var(--tx); margin-top:26px; padding-top:16px; border-top:1px solid var(--b); line-height:1.65; }}
+  .about-body ul{{ color:var(--br); font-size:15px; line-height:1.75; }}
+  .about-body a{{ color:var(--hdr); }}
+
   /* V138: community meme wall */
   .meme-grid{{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-top:12px; }}
   .meme-card{{ margin:0; background:var(--s2); border:1px solid var(--b); border-radius:10px; overflow:hidden; }}
@@ -8478,6 +8488,80 @@ def render_page(page="main"):
 
 """
 
+    _B['about'] = f"""    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
+      <div class="about-body">
+
+  <h1>About Us</h1>
+  <div class="tagline">XRP Complete &middot; Operated by Red Rio Ventures, LLC</div>
+
+  <h2>About Red Rio Ventures, LLC</h2>
+  <p>Red Rio Ventures, LLC is an independent, privately held company focused on building informational
+  and educational tools for the cryptocurrency community. XRP Complete is our flagship product: a free,
+  publicly accessible dashboard that aggregates live market data, news, and publicly available
+  research related to XRP and the broader Ripple ecosystem.</p>
+  <p>We are not a financial institution, exchange, broker-dealer, or custodian. We do not manage funds,
+  execute trades, or provide investment advisory services of any kind.</p>
+
+  <h2>Our Mission</h2>
+  <p><strong>In the United States:</strong> XRP Complete exists to give everyday individuals &mdash; from
+  first-time crypto observers to experienced traders &mdash; free, centralized access to the same
+  caliber of real-time market data, regulatory tracking, and news synthesis that was once scattered
+  across dozens of paid tools and specialist forums. We believe informed participation in emerging
+  financial technology should not require a subscription or a finance degree.</p>
+  <p><strong>Globally:</strong> XRP and the XRP Ledger are used and discussed far beyond U.S. borders.
+  XRP Complete tracks regional adoption, partnerships, and regulatory developments across multiple
+  geographies specifically so that our global audience is not limited to a U.S.-centric view of a
+  worldwide technology. Our goal is to be a genuinely international resource, not a regional one with
+  an international-sounding name.</p>
+
+  <div class="promise-box">
+    <h2>Our Patron Promise</h2>
+    <p style="font-weight:600;color:var(--br);margin-bottom:14px">We will NEVER ask you for your wallet address,
+    private keys, seed phrase, banking information, or any financial account credentials &mdash; for any reason,
+    at any time, through any part of this site.</p>
+    <ul class="promise-list">
+      <li>XRP Complete is a read-only information and education site. There is nothing to log into, nothing to
+      connect, and no wallet to link.</li>
+      <li>We will never send you a message, pop-up, or email asking you to "verify," "connect," or "confirm"
+      a wallet or account.</li>
+      <li>Every calculator and tool on this site runs entirely in your own browser. Nothing you type into a
+      calculator is transmitted, stored, or seen by us.</li>
+      <li>If you ever encounter a page, email, or message claiming to be XRP Complete that asks for financial
+      credentials, it is not us, and we encourage you to disregard it.</li>
+    </ul>
+  </div>
+
+  <h2>What This Site Is</h2>
+  <p>XRP Complete is an aggregation and educational dashboard. We compile publicly available news, publicly
+  available market data from third-party sources (with attribution), and original written analysis. All
+  content is provided for informational and educational purposes only and does not constitute financial,
+  investment, legal, or tax advice. Cryptocurrency markets are volatile and carry substantial risk;
+  always do your own research and consult a licensed professional before making financial decisions.</p>
+
+  <h2>What This Site Is Not</h2>
+  <p>XRP Complete does not offer wallet services, custody of any kind, trading execution, account creation,
+  deposits, withdrawals, or any function that would require a visitor to share personal financial
+  information. We do not sell financial products. We do not offer ads that promote financial products
+  on behalf of third parties.</p>
+
+  <h2>Contact</h2>
+  <div class="contact-box">
+    <p style="margin:0">Red Rio Ventures, LLC<br>
+    Operating XRPComplete.com and XRPCompleteBlog.com<br>
+    Email: <a href="mailto:redrioventures@gmail.com" style="color:var(--hdr);font-weight:700">redrioventures@gmail.com</a></p>
+  </div>
+
+  <div class="fine-print">
+    &copy; 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally. XRP Complete is an independent
+    informational service and is not affiliated with, endorsed by, or sponsored by Ripple Labs Inc.
+    or the XRP Ledger Foundation. XRP and related marks are property of their respective owners.
+  </div>
+
+      </div>
+    </div>
+
+"""
+
     _B['memes'] = f"""    <!-- SECTION 34: COMMUNITY MEME WALL (V138) -->
     <div class="acct" style="border-color:rgba(224,68,124,.35);margin:10px 0">
       <div class="sec-title" style="color:#E0447C"><span class="sic">\U0001F5BC\uFE0F</span> XRP Meme Wall</div>
@@ -8597,7 +8681,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'regulatory': ['regnav', 'regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -9100,106 +9184,7 @@ def blog_ad_png():
 
 @app.route("/about")
 def about_us():
-    html_out = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>About Us — XRP Complete</title>
-<meta name="description" content="About XRP Complete and Red Rio Ventures, LLC — our mission, our commitment to user safety, and what this site does and does not do.">
-<style>
-  :root{{ --bg:#0a0e1a; --s1:#0f1526; --hdr:#03b1fc; --tq:#00e5cc; --tx:#a8bdd0; --br:#e8eef5; --b:#1e2a42; --or:#CC5F00; }}
-  *{{ box-sizing:border-box; }}
-  body{{ background:var(--bg); color:var(--br); font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; margin:0; padding:0; line-height:1.7; }}
-  .w{{ max-width:900px; margin:0 auto; padding:40px 24px 80px; }}
-  .back-link{{ display:inline-block; margin-bottom:24px; color:var(--hdr); text-decoration:none; font-size:14px; font-weight:600; }}
-  .back-link:hover{{ text-decoration:underline; }}
-  h1{{ color:var(--hdr); font-size:32px; margin:0 0 8px; }}
-  .tagline{{ color:var(--tx); font-size:15px; margin-bottom:36px; }}
-  h2{{ color:var(--tq); font-size:20px; margin:36px 0 12px; border-bottom:1px solid var(--b); padding-bottom:8px; }}
-  p{{ font-size:15px; color:var(--br); margin:0 0 14px; }}
-  .promise-box{{ background:var(--s1); border:2px solid var(--or); border-radius:10px; padding:22px 24px; margin:16px 0; }}
-  .promise-box h2{{ margin-top:0; border:none; color:var(--or); }}
-  .promise-list{{ margin:12px 0; padding-left:0; list-style:none; }}
-  .promise-list li{{ padding:6px 0 6px 28px; position:relative; font-size:15px; }}
-  .promise-list li:before{{ content:"\2713"; position:absolute; left:0; color:var(--tq); font-weight:700; }}
-  .fine-print{{ font-size:12.5px; color:var(--tx); margin-top:40px; padding-top:20px; border-top:1px solid var(--b); }}
-  .contact-box{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:18px 20px; margin-top:8px; }}
-</style>
-</head>
-<body>
-<div class="w">
-  <a href="/" class="back-link">&larr; Back to XRP Complete</a>
-  <h1>About Us</h1>
-  <div class="tagline">XRP Complete &middot; Operated by Red Rio Ventures, LLC</div>
-
-  <h2>About Red Rio Ventures, LLC</h2>
-  <p>Red Rio Ventures, LLC is an independent, privately held company focused on building informational
-  and educational tools for the cryptocurrency community. XRP Complete is our flagship product: a free,
-  publicly accessible dashboard that aggregates live market data, news, and publicly available
-  research related to XRP and the broader Ripple ecosystem.</p>
-  <p>We are not a financial institution, exchange, broker-dealer, or custodian. We do not manage funds,
-  execute trades, or provide investment advisory services of any kind.</p>
-
-  <h2>Our Mission</h2>
-  <p><strong>In the United States:</strong> XRP Complete exists to give everyday individuals &mdash; from
-  first-time crypto observers to experienced traders &mdash; free, centralized access to the same
-  caliber of real-time market data, regulatory tracking, and news synthesis that was once scattered
-  across dozens of paid tools and specialist forums. We believe informed participation in emerging
-  financial technology should not require a subscription or a finance degree.</p>
-  <p><strong>Globally:</strong> XRP and the XRP Ledger are used and discussed far beyond U.S. borders.
-  XRP Complete tracks regional adoption, partnerships, and regulatory developments across multiple
-  geographies specifically so that our global audience is not limited to a U.S.-centric view of a
-  worldwide technology. Our goal is to be a genuinely international resource, not a regional one with
-  an international-sounding name.</p>
-
-  <div class="promise-box">
-    <h2>Our Patron Promise</h2>
-    <p style="font-weight:600;color:var(--br);margin-bottom:14px">We will NEVER ask you for your wallet address,
-    private keys, seed phrase, banking information, or any financial account credentials &mdash; for any reason,
-    at any time, through any part of this site.</p>
-    <ul class="promise-list">
-      <li>XRP Complete is a read-only information and education site. There is nothing to log into, nothing to
-      connect, and no wallet to link.</li>
-      <li>We will never send you a message, pop-up, or email asking you to "verify," "connect," or "confirm"
-      a wallet or account.</li>
-      <li>Every calculator and tool on this site runs entirely in your own browser. Nothing you type into a
-      calculator is transmitted, stored, or seen by us.</li>
-      <li>If you ever encounter a page, email, or message claiming to be XRP Complete that asks for financial
-      credentials, it is not us, and we encourage you to disregard it.</li>
-    </ul>
-  </div>
-
-  <h2>What This Site Is</h2>
-  <p>XRP Complete is an aggregation and educational dashboard. We compile publicly available news, publicly
-  available market data from third-party sources (with attribution), and original written analysis. All
-  content is provided for informational and educational purposes only and does not constitute financial,
-  investment, legal, or tax advice. Cryptocurrency markets are volatile and carry substantial risk;
-  always do your own research and consult a licensed professional before making financial decisions.</p>
-
-  <h2>What This Site Is Not</h2>
-  <p>XRP Complete does not offer wallet services, custody of any kind, trading execution, account creation,
-  deposits, withdrawals, or any function that would require a visitor to share personal financial
-  information. We do not sell financial products. We do not offer ads that promote financial products
-  on behalf of third parties.</p>
-
-  <h2>Contact</h2>
-  <div class="contact-box">
-    <p style="margin:0">Red Rio Ventures, LLC<br>
-    Operating XRPComplete.com<br>
-    For inquiries regarding this site, please reach out through the contact channel listed on our
-    primary domain.</p>
-  </div>
-
-  <div class="fine-print">
-    &copy; 2026 XRP Complete / Red Rio Ventures, LLC. All rights reserved globally. XRP Complete is an independent
-    informational service and is not affiliated with, endorsed by, or sponsored by Ripple Labs Inc.
-    or the XRP Ledger Foundation. XRP and related marks are property of their respective owners.
-  </div>
-</div>
-</body>
-</html>"""
-    return Response(html_out, mimetype="text/html")
+    return Response(replace_flags_with_svg(render_page("about")), mimetype="text/html")
 
 
 @app.route("/ping")
@@ -9219,6 +9204,7 @@ def ping():
 _COPYRIGHT_ARCHIVE_FILE = "copyright_archive_2026_07_04.html"
 _COPYRIGHT_ARCHIVE_FILE_B = "copyright_archive_2026_07_07_b.html"
 _COPYRIGHT_ARCHIVE_FILE_C = "copyright_archive_2026_07_12_c.html"
+_COPYRIGHT_ARCHIVE_FILE_D = "copyright_archive_2026_07_26_d.html"
 
 @app.route("/copyright7_26")
 def copyright_archive_2026_07_04():
@@ -9236,6 +9222,21 @@ def copyright_archive_2026_07_07_b():
     # dated proof of authorship; this route adds a second, later dated proof point.
     try:
         with open(_COPYRIGHT_ARCHIVE_FILE_B, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return "Archive temporarily unavailable.", 503
+
+
+@app.route("/copyright7_26_d")
+def copyright_archive_2026_07_26_d():
+    # Fourth, independent dated snapshot (captured 2026-07-26, V139) — the first
+    # documenting the six-page architecture rather than the original single-page
+    # site. The three earlier snapshots (2026-07-04, 2026-07-07, 2026-07-12) are
+    # untouched and remain the earliest dated proofs of authorship. Like those,
+    # this route is frozen: it is served verbatim from disk, never regenerated,
+    # never edited and never deleted.
+    try:
+        with open(_COPYRIGHT_ARCHIVE_FILE_D, "r", encoding="utf-8") as f:
             return f.read()
     except Exception:
         return "Archive temporarily unavailable.", 503
@@ -9262,6 +9263,7 @@ def robots_txt():
         "Disallow: /copyright7_26\n"
         "Disallow: /copyright7_26_b\n"
         "Disallow: /copyright7_26_c\n"
+        "Disallow: /copyright7_26_d\n"
     ), 200, {"Content-Type": "text/plain"}
 
 
