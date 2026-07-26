@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "142"
+APP_VERSION = "143"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -5103,7 +5103,7 @@ ECOSYSTEM_CARDS = [
     {"ic": "\U0001F48E", "name": "XRP", "role": "The Asset", "color": "var(--gr)",
      "bg": "rgba(72,255,130,.06)", "bd": "rgba(72,255,130,.3)",
      "desc": "Native digital asset of the XRPL. Used as bridge currency in ODL, transaction gas, and wallet reserve. Fixed supply of 100 billion \u2014 no mining, no inflation. Burned slightly with every transaction.",
-     "stats": [("Total Supply", "100B XRP"), ("Circulating", "~62B XRP"), ("In Escrow", "~38.2B XRP")]},
+     "stats": [("Total Supply", "100B XRP"), ("Circulating", "~61.9B XRP"), ("In Escrow", "~38.2B XRP")]},
     {"ic": "\U0001F310", "name": "RippleNet", "role": "The Network", "color": "var(--or)",
      "bg": "rgba(255,153,0,.06)", "bd": "rgba(255,153,0,.3)",
      "desc": "Ripple's B2B payment network connecting 300+ financial institutions globally. Three tiers: Direct (messaging), Multi-hop (routing), and ODL (XRP bridge). Banks choose their level of XRP integration.",
@@ -6824,7 +6824,12 @@ def render_page(page="main"):
   .gn-foot{{ display:flex; align-items:center; gap:8px; font-size:15px; font-family:var(--mn); font-weight:700; }}
   .gn-dot{{ width:12px; height:12px; border-radius:50%; display:inline-block; }}
   .gn-empty{{ padding:22px; text-align:center; color:var(--tx); font-family:var(--mn); font-size:15px; }}
-  .rail{{ display:flex; flex-direction:column; gap:10px; }}
+  /* V143: the story list runs far longer than the rail, which stranded a tall
+     empty column beneath it. Sticky keeps the rail in view while the feed
+     scrolls, so the space stays useful instead of blank. Disabled below 900px
+     where the grid collapses to one column and the rail sits under the feed. */
+  .rail{{ display:flex; flex-direction:column; gap:10px; position:sticky; top:64px;
+          align-self:start; max-height:calc(100vh - 80px); overflow-y:auto; }}
   .rail-panel{{ background:var(--s1); border:1px solid var(--b); border-radius:10px; padding:16px 18px; }}
   .rail-h{{ font-size:15px; font-weight:800; font-family:var(--mn); letter-spacing:1.5px; text-transform:uppercase;
     color:var(--hdr); display:flex; align-items:center; gap:10px; margin-bottom:6px; }}
@@ -6834,7 +6839,8 @@ def render_page(page="main"):
   .rail-row:last-child{{ border-bottom:none; }}
   .rail-k{{ color:var(--tx); }}
   .rail-v{{ font-weight:700; color:var(--br); text-align:right; white-space:nowrap; }}
-  @media(max-width:900px){{ .feed-wrap{{ grid-template-columns:1fr; }} }}
+  @media(max-width:900px){{ .feed-wrap{{ grid-template-columns:1fr; }}
+                           .rail{{ position:static; max-height:none; overflow:visible; }} }}
 
   /* Analytics Lab */
   .lab3{{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px; }}
@@ -8033,7 +8039,7 @@ def render_page(page="main"):
           <div class="rail-row"><span class="rail-k">Consensus</span><span class="rail-v">Federated Byzantine</span></div>
           <div class="rail-row"><span class="rail-k">Ledger Close</span><span class="rail-v">~3-5 seconds</span></div>
           <div class="rail-row"><span class="rail-k">Tx Fee</span><span class="rail-v">~0.00001 XRP</span></div>
-          <div class="rail-row"><span class="rail-k">Circulating</span><span class="rail-v" style="color:var(--gr)">62.2B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Circulating</span><span class="rail-v" style="color:var(--gr)">~61.9B XRP</span></div>
           <div class="rail-row"><span class="rail-k">Escrow Locked</span><span class="rail-v">~38.2B XRP</span></div>
           <div class="rail-row"><span class="rail-k">Total Supply</span><span class="rail-v">100B XRP</span></div>
         </div>
