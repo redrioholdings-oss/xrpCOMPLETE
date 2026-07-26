@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "135"
+APP_VERSION = "136"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3734,6 +3734,67 @@ def _intel_heads(stories, empty="No stories in the current cycle."):
     return out + '</div>'
 
 
+# ── PROPRIETARY / OFFICIAL SOURCE FEED (V136) ────────────────────────────────
+# Zero added load: every story below already arrives through the existing news
+# cycle -- this is a filtered view of the pool, not a new set of HTTP fetches,
+# so it adds no requests, no new failure points and no risk to the site.
+# Tiers are kept honest and separate: only publications Ripple/XRPL actually
+# own are called first-party. Google News queries that track Ripple executives
+# are third-party reporting ABOUT official figures and are labelled as such.
+FIRST_PARTY_SOURCES = {"Ripple Insights", "XRPL.org Blog"}
+OFFICIAL_COVERAGE_SOURCES = {
+    "GN: Garlinghouse", "GN: Ripple CEO", "GN: Brad Interview", "GN: David Schwartz",
+    "GN: Monica Long", "GN: Ripple Labs", "GN: XRPLF",
+}
+# Official properties that publish no usable public RSS -- linked, never scraped.
+OFFICIAL_DIRECTORY = [
+    ("Ripple Insights",      "https://ripple.com/insights/",     "Ripple's own company blog", True),
+    ("XRPL.org Blog",        "https://xrpl.org/blog/",           "Core ledger development blog", True),
+    ("XRPL Foundation",      "https://www.xrpl.foundation/",     "Foundation (Paris entity, est. 2024)", False),
+    ("XRPLF Legacy Site",    "https://xrplf.org/",               "Original foundation site", False),
+    ("XRPL Commons",         "https://xrpl-commons.org/",        "Ecosystem-adjacent, not Ripple-owned", False),
+    ("XRPLF on GitHub",      "https://github.com/XRPLF",         "Reference implementations & XLS standards", False),
+    ("Ripple Newsroom",      "https://ripple.com/press-releases/", "Official press releases", False),
+    ("XRPL Dev Portal",      "https://xrpl.org/docs.html",       "Protocol documentation", False),
+    ("RippleX",              "https://ripplex.io/",              "Ripple's developer arm", False),
+]
+
+
+def proprietary_feed_html(limit=8):
+    """Filtered view of first-party and official-entity stories already in the pool."""
+    pool = NEWS.get("pool", [])
+    first = sorted((s for s in pool if s.get("source") in FIRST_PARTY_SOURCES),
+                   key=lambda s: s["dt"], reverse=True)[:limit]
+    cover = sorted((s for s in pool if s.get("source") in OFFICIAL_COVERAGE_SOURCES),
+                   key=lambda s: s["dt"], reverse=True)[:limit]
+
+    def rows(stories, empty):
+        if not stories:
+            return f'<div class="ih-empty">{empty}</div>'
+        out = '<div class="intel-heads">'
+        for s in stories:
+            dot = {"bullish": "var(--gr)", "bearish": "var(--rd)"}.get(s["sentiment"], "var(--tx)")
+            out += (f'<a class="ih-item" href="{html.escape(s.get("link") or "#", quote=True)}" '
+                    f'target="_blank" rel="noopener">'
+                    f'<span class="ih-dot" style="background:{dot}"></span>'
+                    f'<span class="ih-t">{html.escape(s["title"][:130])}</span>'
+                    f'<span class="ih-m">{html.escape(s["source"])} \u00B7 {_time_ago(s["dt"])}</span></a>')
+        return out + '</div>'
+
+    directory = '<div class="pf-dir">' + "".join(
+        f'<a class="pf-d" href="{u}" target="_blank" rel="noopener">'
+        f'<span class="pf-dn">{html.escape(n)}'
+        + ('<span class="pf-badge">LIVE</span>' if live else '')
+        + f'</span><span class="pf-dd">{html.escape(d)}</span></a>'
+        for n, u, d, live in OFFICIAL_DIRECTORY) + '</div>'
+
+    return (rows(first, "No first-party posts in the current cycle \u2014 Ripple and XRPL.org "
+                        "publish less often than the wider media, so a quiet window here is normal "
+                        "and is reported as such rather than padded."),
+            rows(cover, "No coverage of official Ripple figures in the current cycle."),
+            directory, len(first), len(cover))
+
+
 def us_intelligence():
     """News-derived US briefing. (Upgrade point: swap internals for a Claude API call,
     keeping this computed version as the fallback.)"""
@@ -5740,6 +5801,9 @@ def render_page(page="main"):
     )
     us_ts = us["ts"] or "\u2014"
     gl_ts = gl["ts"] or "\u2014"
+    # V136: proprietary / official source feed (filtered from existing pool)
+    pf_first, pf_cover, pf_dir, pf_nf, pf_nc = proprietary_feed_html()
+
     # V135: expanded panels
     us_stats = _intel_stats([("Stories", us.get("n", 0), "var(--hdr)"),
                              ("Bullish", us.get("bulls", 0), "var(--gr)"),
@@ -6859,6 +6923,15 @@ def render_page(page="main"):
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
 
+  /* V136: proprietary source directory */
+  .pf-dir{{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:8px; }}
+  .pf-d{{ background:var(--s2); border:1px solid var(--b); border-radius:8px; padding:9px 11px; text-decoration:none; display:block; }}
+  .pf-d:hover{{ border-color:rgba(0,229,204,.6); }}
+  .pf-dn{{ display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:800; color:var(--br); }}
+  .pf-dd{{ display:block; font-size:11px; color:var(--tx); margin-top:2px; }}
+  .pf-badge{{ font-family:var(--mn); font-size:8.5px; font-weight:900; letter-spacing:.8px; color:#04121f;
+              background:var(--gr); border-radius:3px; padding:1px 4px; }}
+
   /* V135: expanded US Intelligence / Global Pulse panels */
   .intel-stats{{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:10px 0 12px; }}
   .intel-stat{{ background:var(--s2); border:1px solid var(--b); border-radius:8px; padding:8px 4px; text-align:center; }}
@@ -7368,6 +7441,23 @@ def render_page(page="main"):
         <button class="trk-btn" data-filter="PILOT" onclick="filterTracker('PILOT',this)" style="color:var(--or);border-color:rgba(255,153,0,.5)">\U0001F9EA PILOT</button>
         <button class="trk-btn" data-filter="COMPETING" onclick="filterTracker('COMPETING',this)" style="color:var(--rd);border-color:rgba(255,64,96,.5)">\u2694\uFE0F COMPETING</button>
       </div>
+    </div>
+
+"""
+
+    _B['propfeed'] = f"""    <!-- SECTION 32: PROPRIETARY / OFFICIAL SOURCE FEED (V136) -->
+    <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--tq)"><span class="sic">\U0001F6F0\uFE0F</span> Proprietary &amp; Official Sources</div>
+      <div class="trk-tag" style="color:var(--tx)">Straight from the organisations that build XRP and the XRP Ledger. These stories already arrive through the site's existing news cycle \u2014 this is a filtered view of that pool, so it adds no extra requests and no additional load or failure points.</div>
+      <div class="intel-sub">First-party publications \u2014 {pf_nf} in this cycle</div>
+      <div style="font-size:11.5px;color:var(--tx);margin:-3px 0 8px">Published by Ripple and XRPL.org themselves.</div>
+      {pf_first}
+      <div class="intel-sub">Official figures in the press \u2014 {pf_nc} in this cycle</div>
+      <div style="font-size:11.5px;color:var(--tx);margin:-3px 0 8px">Independent reporting <em>about</em> Ripple leadership and the Foundation \u2014 not first-party material, and labelled separately so the distinction stays clear.</div>
+      {pf_cover}
+      <div class="intel-sub">Official source directory</div>
+      <div style="font-size:11.5px;color:var(--tx);margin:-3px 0 8px">Entries marked LIVE are polled continuously by this site. The rest publish no usable public feed, so they are linked for reference only \u2014 never scraped.</div>
+      {pf_dir}
     </div>
 
 """
@@ -7927,6 +8017,9 @@ def render_page(page="main"):
         An ever-growing record of banks, institutions, and enterprises using XRP, XRPL, or Ripple technology \u2014 from
         foundational partnerships to newly announced deals. New entries are detected automatically from the live news feed
         and added here permanently; nothing is ever removed. Newest announcements shown first.
+        Fresh deals appear first under <a href="/#newdeals" style="color:var(--hdr)">New Partnerships &amp; Deals \u2014 This Week</a>
+        on the Main page and roll into this permanent directory once they pass seven days. Both views read the same ledger,
+        so nothing is copied, moved or lost in the handover \u2014 and no entry is ever added by hand.
       </div>
       <div class="feed-wrap">
         <div>
@@ -8427,7 +8520,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
