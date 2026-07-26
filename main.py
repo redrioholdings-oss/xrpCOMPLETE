@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "143"
+APP_VERSION = "145"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -8059,6 +8059,13 @@ def render_page(page="main"):
           <div class="rail-h"><span class="sic">\u23F3</span> Ripple Escrow</div>
           <div class="rail-row"><span class="rail-k">Next Release</span><span class="rail-v" style="color:var(--yl)">{esc_next_str}</span></div>
           <div class="rail-row"><span class="rail-k">Amount</span><span class="rail-v">1B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Cadence</span><span class="rail-v">1st, 00:00 UTC</span></div>
+          <div class="rail-row"><span class="rail-k">Locked Dec 2017</span><span class="rail-v">55B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Still Locked</span><span class="rail-v">~38.2B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Net Released</span><span class="rail-v" style="color:var(--gr)">~16.8B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Share of Supply</span><span class="rail-v">~38%</span></div>
+          <div class="rail-row"><span class="rail-k">Escrow Drawn</span><span class="rail-v" style="color:var(--bl)">~31%</span></div>
+          <div class="rail-row"><span class="rail-k">Unused Portion</span><span class="rail-v">Re-escrowed</span></div>
         </div>
       </div>
     </div>
@@ -8612,39 +8619,12 @@ def render_page(page="main"):
                 <div style="font-size:12px;color:var(--tx);margin-bottom:8px">Next scheduled release (1B XRP, 1st of month 00:00 UTC):</div>
                 <div id="esc-countdown" data-eta="{esc_iso}" style="font-size:22px;font-weight:900;font-family:var(--mn);color:var(--bl);margin-bottom:8px">\u2014</div>
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);border-top:1px solid var(--b);padding-top:8px">
-                  <span>Originally locked (Dec 2017)</span><span style="color:var(--br);font-weight:700">55B XRP</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
-                  <span>Still in escrow</span><span style="color:var(--br);font-weight:700">~38.2B XRP</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
-                  <span>Net released to date</span><span style="color:var(--br);font-weight:700">~16.8B XRP</span>
+                  <span>Total in escrow</span><span style="color:var(--br);font-weight:700">~38.2B XRP</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
                   <span>Circulating supply</span><span style="color:var(--br);font-weight:700">~61.9B XRP</span>
                 </div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
-                  <span>Locked share of total supply</span><span style="color:var(--br);font-weight:700">~38%</span>
-                </div>
-                <div style="height:7px;background:var(--s1);border-radius:4px;overflow:hidden;margin-top:8px">
-                  <div style="height:100%;width:30.5%;background:var(--bl)"></div>
-                </div>
-                <div style="font-size:11px;color:var(--tx);margin-top:4px">Roughly 31% of the original 55B escrow has been released and not re-locked.</div>
-                <div style="font-size:12px;color:var(--tx);margin-top:10px;border-top:1px solid var(--b);padding-top:8px;line-height:1.6">
-                  <b style="color:var(--br)">A 1B unlock is not 1B sold.</b> Ripple typically re-escrows most of each
-                  month's release, so only the retained portion can reach the market. The June 2026 unlock moved in
-                  three transfers (500M / 400M / 100M).
-                </div>
-                <div style="font-size:12px;color:var(--tx);margin-top:8px;line-height:1.6">
-                  <b style="color:var(--br)">Effect on price is not clear-cut.</b> The schedule is public years in
-                  advance, most tokens are re-locked, and the net release is small next to daily volume \u2014 there is
-                  little evidence of a consistent price effect around release dates.
-                </div>
-                <div style="font-size:12px;color:var(--tx);margin-top:8px;line-height:1.6">
-                  <b style="color:var(--br)">No burn, no buyback.</b> Ripple buys back its own private shares, not XRP,
-                  and has declined community proposals to burn the escrow.
-                </div>
-                <div style="font-size:12px;color:var(--tx);margin-top:8px;font-style:italic;border-top:1px solid var(--b);padding-top:8px">Escrow addresses are public and independently verifiable on-chain \u2014 this is Ripple's own locked supply, not a personal wallet lookup. Balances are approximate and move with each monthly cycle; exhaustion timing is genuinely uncertain because of re-escrowing.</div>
+                <div style="font-size:12px;color:var(--tx);margin-top:8px;font-style:italic">Escrow addresses are public and independently verifiable on-chain \u2014 this is Ripple's own locked supply, not a personal wallet lookup.</div>
               </div>
             </div>
           </div>
