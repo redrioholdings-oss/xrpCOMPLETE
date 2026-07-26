@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "134"
+APP_VERSION = "135"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3702,6 +3702,38 @@ def _matches(story, kws):
     t = (story["title"] + " " + story["source"]).lower()
     return any(k in t for k in kws)
 
+def _intel_stats(pairs):
+    """Compact stat strip used by US Intelligence / Global Pulse."""
+    return ('<div class="intel-stats">' + "".join(
+        f'<div class="intel-stat"><div class="is-n" style="color:{c}">{v}</div>'
+        f'<div class="is-l">{lbl}</div></div>' for lbl, v, c in pairs) + '</div>')
+
+
+def _intel_bars(rows):
+    """Labelled count bars; width is share of the largest row."""
+    mx = max((v for _, v, _ in rows), default=0) or 1
+    return '<div class="intel-bars">' + "".join(
+        f'<div class="ib-row"><span class="ib-l">{lbl}</span>'
+        f'<span class="ib-t"><span class="ib-f" style="width:{v/mx*100:.0f}%;background:{c}"></span></span>'
+        f'<span class="ib-n">{v}</span></div>' for lbl, v, c in rows) + '</div>'
+
+
+def _intel_heads(stories, empty="No stories in the current cycle."):
+    """Real headlines from the pool -- linked, sourced and timestamped."""
+    if not stories:
+        return f'<div class="ih-empty">{empty}</div>'
+    out = '<div class="intel-heads">'
+    for s in stories:
+        dot = {"bullish": "var(--gr)", "bearish": "var(--rd)"}.get(s["sentiment"], "var(--tx)")
+        t = html.escape(s["title"][:110])
+        link = html.escape(s.get("link") or "#", quote=True)
+        out += (f'<a class="ih-item" href="{link}" target="_blank" rel="noopener">'
+                f'<span class="ih-dot" style="background:{dot}"></span>'
+                f'<span class="ih-t">{t}</span>'
+                f'<span class="ih-m">{html.escape(s["source"])} \u00B7 {_time_ago(s["dt"])}</span></a>')
+    return out + '</div>'
+
+
 def us_intelligence():
     """News-derived US briefing. (Upgrade point: swap internals for a Claude API call,
     keeping this computed version as the fallback.)"""
@@ -3711,7 +3743,9 @@ def us_intelligence():
     if not us:
         return {"pulse": "Awaiting US market signals \u2014 the news feed is still loading.",
                 "regulatory": "No US regulatory headlines in the current cycle.",
-                "institutional": "No US institutional headlines in the current cycle.", "ts": ts}
+                "institutional": "No US institutional headlines in the current cycle.", "ts": ts,
+                "n": 0, "bulls": 0, "bears": 0, "neut": 0, "breakdown": [], "top": [],
+                "lead_src": None, "n_sources": 0}
     bulls = sum(1 for s in us if s["sentiment"] == "bullish")
     bears = sum(1 for s in us if s["sentiment"] == "bearish")
     lean = "bullish" if bulls > bears else "bearish" if bears > bulls else "balanced"
@@ -3724,7 +3758,22 @@ def us_intelligence():
     inst = [s for s in us if _matches(s, {"etf", "bank", "custody", "blackrock", "fidelity", "nasdaq", "institutional", "fund"})]
     institutional = (f"{len(inst)} stor{'y' if len(inst) == 1 else 'ies'} cover{'s' if len(inst) == 1 else ''} US institutional activity (ETFs, banks, custody)."
                      if inst else "No notable US institutional moves this cycle.")
-    return {"pulse": pulse, "regulatory": regulatory, "institutional": institutional, "ts": ts}
+    # V135: additional breakdowns + real headlines, all derived from the same
+    # story pool. Counts are actual matches -- never estimated or padded.
+    legal = [s for s in us if _matches(s, {"court", "judge", "ruling", "appeal", "lawsuit", "settlement", "litigation"})]
+    legis = [s for s in us if _matches(s, {"congress", "senate", "house", "bill", "act", "legislation", "lawmaker", "clarity"})]
+    enforce = [s for s in us if _matches(s, {"enforcement", "fine", "penalty", "subpoena", "investigation", "charges"})]
+    breakdown = [("Regulatory", len(reg), "var(--bl)"), ("Institutional", len(inst), "var(--gr)"),
+                 ("Legal & Courts", len(legal), "var(--yl)"), ("Legislation", len(legis), "var(--or)"),
+                 ("Enforcement", len(enforce), "var(--rd)")]
+    top = sorted(us, key=lambda s: s["dt"], reverse=True)[:3]
+    sources = {}
+    for s in us:
+        sources[s["source"]] = sources.get(s["source"], 0) + 1
+    lead_src = max(sources.items(), key=lambda kv: kv[1])[0] if sources else None
+    return {"pulse": pulse, "regulatory": regulatory, "institutional": institutional, "ts": ts,
+            "n": n, "bulls": bulls, "bears": bears, "neut": n - bulls - bears,
+            "breakdown": breakdown, "top": top, "lead_src": lead_src, "n_sources": len(sources)}
 
 def _region_signals():
     pool = NEWS.get("pool", [])
@@ -3746,7 +3795,9 @@ def global_pulse():
     signals = _region_signals()
     if not pool:
         return {"pulse": "Awaiting global signals \u2014 the news feed is still loading.",
-                "thesis": "Region signals populate as feeds report in.", "signals": signals, "ts": ts}
+                "thesis": "Region signals populate as feeds report in.", "signals": signals, "ts": ts,
+                "total": 0, "bulls": 0, "bears": 0, "neut": 0, "active": 0,
+                "reg_counts": {}, "busiest": None, "top": []}
     bulls = sum(1 for s in pool if s["sentiment"] == "bullish")
     bears = sum(1 for s in pool if s["sentiment"] == "bearish")
     active = [r for r in REGIONS if signals[r] != "quiet"]
@@ -3761,7 +3812,18 @@ def global_pulse():
     thesis += ("Broad positive flow supports continuation \u2014 watch US regulatory catalysts for confirmation."
                if bulls >= bears else
                "Mixed-to-cautious flow points to range-bound action until a clearer catalyst emerges.")
-    return {"pulse": pulse, "thesis": thesis, "signals": signals, "ts": ts}
+    # V135: per-region volume (not just lean) + real headlines from the pool.
+    reg_counts = {}
+    for r in REGIONS:
+        rs = [s for s in pool if s.get("region") == r]
+        reg_counts[r] = (len(rs),
+                         sum(1 for s in rs if s["sentiment"] == "bullish"),
+                         sum(1 for s in rs if s["sentiment"] == "bearish"))
+    busiest = max(reg_counts.items(), key=lambda kv: kv[1][0])[0] if reg_counts else None
+    top = sorted(pool, key=lambda s: s["dt"], reverse=True)[:3]
+    return {"pulse": pulse, "thesis": thesis, "signals": signals, "ts": ts,
+            "total": len(pool), "bulls": bulls, "bears": bears, "neut": len(pool) - bulls - bears,
+            "active": len(active), "reg_counts": reg_counts, "busiest": busiest, "top": top}
 
 def _fmt_usd(v):
     if not v:
@@ -4381,11 +4443,11 @@ def regional_heatmap_html():
             inten = c / mx
             bg = f"rgba(72,255,130,{0.06 + inten * 0.22:.2f})"
             bd = f"rgba(72,255,130,{0.25 + inten * 0.45:.2f})"
-            num_col = "var(--gr)"
+            num_col = "#ffffff"      # V135: white reads far better on the green tint than green-on-green
         else:
             bg = "var(--s2)"
             bd = "var(--b)"
-            num_col = "var(--tx)"
+            num_col = "var(--br)"    # V135: was --tx, too dim for a headline figure
         cards += (
             f'<div class="rh-card" style="background:{bg};border-color:{bd}">'
             f'<div class="rh-flag">{REGION_FLAGS.get(reg, "")}</div>'
@@ -5678,6 +5740,27 @@ def render_page(page="main"):
     )
     us_ts = us["ts"] or "\u2014"
     gl_ts = gl["ts"] or "\u2014"
+    # V135: expanded panels
+    us_stats = _intel_stats([("Stories", us.get("n", 0), "var(--hdr)"),
+                             ("Bullish", us.get("bulls", 0), "var(--gr)"),
+                             ("Bearish", us.get("bears", 0), "var(--rd)"),
+                             ("Neutral", us.get("neut", 0), "var(--tx)")])
+    us_bars = _intel_bars(us.get("breakdown", [])) if us.get("breakdown") else ""
+    us_heads = _intel_heads(us.get("top", []), "No US-focused stories in the current cycle.")
+    us_srcline = (f'Drawn from {us.get("n_sources", 0)} US-reporting source'
+                  f'{"" if us.get("n_sources", 0) == 1 else "s"}'
+                  + (f' \u00B7 most active: {html.escape(us["lead_src"])}' if us.get("lead_src") else ''))
+    gl_stats = _intel_stats([("Stories", gl.get("total", 0), "var(--hdr)"),
+                             ("Regions live", gl.get("active", 0), "var(--tq)"),
+                             ("Bullish", gl.get("bulls", 0), "var(--gr)"),
+                             ("Bearish", gl.get("bears", 0), "var(--rd)")])
+    _rc = gl.get("reg_counts", {})
+    gl_bars = _intel_bars([(REGION_DISPLAY.get(r, r), _rc[r][0],
+                            "var(--gr)" if _rc[r][1] > _rc[r][2] else "var(--rd)" if _rc[r][2] > _rc[r][1] else "var(--bl)")
+                           for r in REGIONS if _rc.get(r, (0,))[0] > 0]) if _rc else ""
+    gl_heads = _intel_heads(gl.get("top", []), "No global stories in the current cycle.")
+    gl_srcline = (f'Busiest region: {REGION_DISPLAY.get(gl["busiest"], gl["busiest"])}'
+                  if gl.get("busiest") else "Region volumes populate as feeds report in.")
     us_pulse = us["pulse"]
     us_regulatory = us["regulatory"]
     us_institutional = us["institutional"]
@@ -6428,7 +6511,7 @@ def render_page(page="main"):
   .rh-card{{ border:1px solid var(--b); border-radius:10px; padding:16px 12px; text-align:center; }}
   .rh-flag{{ font-size:22px; line-height:1; }}
   .rh-name{{ font-size:15px; font-weight:800; color:var(--br); font-family:var(--mn); margin:6px 0; }}
-  .rh-num{{ font-size:22px; font-weight:900; font-family:var(--mn); line-height:1; }}
+  .rh-num{{ font-size:32px; font-weight:900; font-family:var(--mn); line-height:1; text-shadow:0 0 10px rgba(0,0,0,.55); }}
   .rh-lbl{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-top:5px; }}
   @media(max-width:900px){{ .rh-grid{{ grid-template-columns:repeat(2,1fr); }} }}
 
@@ -6776,6 +6859,32 @@ def render_page(page="main"):
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
 
+  /* V135: expanded US Intelligence / Global Pulse panels */
+  .intel-stats{{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:10px 0 12px; }}
+  .intel-stat{{ background:var(--s2); border:1px solid var(--b); border-radius:8px; padding:8px 4px; text-align:center; }}
+  .is-n{{ font-family:var(--mn); font-size:20px; font-weight:900; line-height:1; }}
+  .is-l{{ font-size:10.5px; color:var(--tx); margin-top:3px; letter-spacing:.4px; }}
+  .intel-sub{{ font-size:11px; letter-spacing:1.4px; text-transform:uppercase; color:var(--hdr);
+               font-weight:800; margin:14px 0 7px; border-top:1px solid var(--b); padding-top:10px; }}
+  .intel-bars{{ display:flex; flex-direction:column; gap:5px; }}
+  .ib-row{{ display:grid; grid-template-columns:104px 1fr 26px; align-items:center; gap:8px; }}
+  .ib-l{{ font-size:12px; color:var(--tx); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .ib-t{{ height:7px; background:var(--s2); border-radius:4px; overflow:hidden; display:block; }}
+  .ib-f{{ display:block; height:100%; border-radius:4px; }}
+  .ib-n{{ font-family:var(--mn); font-size:12px; font-weight:800; color:var(--br); text-align:right; }}
+  .intel-heads{{ display:flex; flex-direction:column; gap:7px; }}
+  .ih-item{{ display:grid; grid-template-columns:8px 1fr; gap:8px; text-decoration:none;
+             background:var(--s2); border:1px solid var(--b); border-radius:8px; padding:8px 10px; }}
+  .ih-item:hover{{ border-color:rgba(3,177,252,.6); }}
+  .ih-dot{{ width:8px; height:8px; border-radius:50%; margin-top:5px; }}
+  .ih-t{{ font-size:12.5px; color:var(--br); line-height:1.45; }}
+  .ih-m{{ grid-column:2; font-family:var(--mn); font-size:10px; color:var(--tx); margin-top:3px; }}
+  .ih-empty{{ font-size:12.5px; color:var(--tx); font-style:italic; }}
+  .intel-foot{{ font-size:11px; color:var(--tx); margin-top:12px; border-top:1px solid var(--b); padding-top:8px; }}
+  @media(max-width:700px){{ .ib-row{{ grid-template-columns:82px 1fr 24px; }} }}
+
+  .nav-marker{{ text-decoration:none; transition:border-color .15s, background .15s; }}
+  .nav-marker:hover{{ border-color:rgba(3,177,252,.7)!important; background:#1b2537; }}
   /* V133: Global Trading Hub Overlap */
   .th-axis{{ display:grid; grid-template-columns:118px repeat(8,1fr); font-family:var(--mn); font-size:10px;
              color:var(--tx); border-bottom:1px solid var(--b); padding-bottom:5px; margin-bottom:8px; }}
@@ -7287,6 +7396,24 @@ def render_page(page="main"):
 
 """
 
+    _B['newsnav'] = f"""    <!-- SECTION 10b: NEWS -> MAIN QUICK MARKERS (V135) -->
+    <div class="srow" style="margin:10px 0 14px">
+      <a class="si nav-marker" href="/#brief">
+        <span><span class="sic" style="font-size:17px">\U0001F4F0</span> <b style="color:var(--br)">Intelligence Brief</b><br><span style="font-size:12px;color:var(--tx)">4 editions daily on Main</span></span>
+        <span style="color:var(--hdr);font-weight:800">&rarr;</span>
+      </a>
+      <a class="si nav-marker" href="/">
+        <span><span class="sic" style="font-size:17px">\u26A1</span> <b style="color:var(--br)">Breaking News</b><br><span style="font-size:12px;color:var(--tx)">Live ticker at top of Main</span></span>
+        <span style="color:var(--hdr);font-weight:800">&rarr;</span>
+      </a>
+      <a class="si nav-marker" href="/#newdeals">
+        <span><span class="sic" style="font-size:17px">\U0001F91D</span> <b style="color:var(--br)">New Deals This Week</b><br><span style="font-size:12px;color:var(--tx)">Partnerships on Main</span></span>
+        <span style="color:var(--hdr);font-weight:800">&rarr;</span>
+      </a>
+    </div>
+
+"""
+
     _B['top20'] = f"""    <!-- SECTION 10: TOP 20 XRP STORIES (two subsections) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3C6</span> Top 20 XRP Stories</div>
@@ -7311,8 +7438,14 @@ def render_page(page="main"):
         </div>
         <div class="intel-b">
           <div class="intel-pulse">{us_pulse}</div>
+          {us_stats}
           <div class="intel-row"><b>Regulatory</b><br>{us_regulatory}</div>
           <div class="intel-row"><b>Institutional</b><br>{us_institutional}</div>
+          <div class="intel-sub">Coverage breakdown</div>
+          {us_bars}
+          <div class="intel-sub">Latest US headlines</div>
+          {us_heads}
+          <div class="intel-foot">{us_srcline}</div>
         </div>
       </div>
       <div class="intel" style="border-color:rgba(72,255,130,.35)">
@@ -7322,8 +7455,14 @@ def render_page(page="main"):
         </div>
         <div class="intel-b">
           <div class="intel-pulse">{gl_pulse}</div>
+          {gl_stats}
           <div class="intel-row"><b>Thesis</b><br>{gl_thesis}</div>
           <div class="sig-row">{gl_signals_html}</div>
+          <div class="intel-sub">Stories by region</div>
+          {gl_bars}
+          <div class="intel-sub">Latest global headlines</div>
+          {gl_heads}
+          <div class="intel-foot">{gl_srcline}</div>
         </div>
       </div>
     </div>
@@ -7490,7 +7629,7 @@ def render_page(page="main"):
 """
 
     _B['brief'] = f"""    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (four editions daily — 06:00, 11:55, 18:00, 23:55 UTC) -->
-    <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
+    <div id="brief" class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr);margin-bottom:10px"><span class="sic">\U0001F52E</span> XRP Intelligence Brief</div>
 
       <div class="brf-teaser">
@@ -7711,7 +7850,7 @@ def render_page(page="main"):
 """
 
     _B['regradar'] = f"""    <!-- SECTION 25: REGULATORY RADAR -->
-    <div class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
+    <div id="regradar" class="acct" style="border-color:rgba(255,153,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F3DB\uFE0F</span> Regulatory Radar</div>
 
       <div class="trk-tag" style="color:var(--tx);display:flex;justify-content:space-between">
@@ -7768,7 +7907,7 @@ def render_page(page="main"):
 """
 
     _B['newdeals'] = f"""    <!-- SECTION 27b: NEW PARTNERSHIPS & DEALS \u2014 LAST 7 DAYS (V132) -->
-    <div class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
+    <div id="newdeals" class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--gr)"><span class="sic">\U0001F91D</span> New Partnerships &amp; Deals \u2014 This Week</div>
       <div class="trk-tag" style="color:var(--tx)">Only partnerships and traditional-finance deals detected in the last 7 days \u2014 {nd_count} currently listed. Updates automatically as the feed runs; entries older than a week roll into the <a href="/institutional" style="color:var(--hdr)">Global Partnership Directory</a>.</div>
       <div class="pl-list" style="margin-top:10px">
@@ -8288,7 +8427,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
