@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "133"
+APP_VERSION = "134"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -4063,7 +4063,9 @@ def trading_hub_overlap_html():
             f'<div class="th-now" style="left:{now_frac/24*100:.4f}%"></div></div>'
             f'</div>')
 
-    axis = "".join(f'<span>{u:02d}</span>' for u in range(0, 24, 3))
+    # Leading cell labels the scale so the hour ticks are unambiguous.
+    axis = ('<span class="th-zone">HOURS \u00B7 UTC</span>'
+            + "".join(f'<span>{u:02d}:00</span>' for u in range(0, 24, 3)))
     peak_end = (best_start + best_len) % 24
     return (rows, axis, open_now, len(hubs), f"{best_start:02d}:00\u2013{peak_end:02d}:00",
             max_c, f"{now.hour:02d}:{now.minute:02d}")
@@ -5795,7 +5797,7 @@ def render_page(page="main"):
     wc_html = world_clocks_html()
 
     # Brief Home — designated schedule strip (this week's 14 editions)
-    _now_ct = datetime.now(CENTRAL)
+    _now_ct = datetime.now(timezone.utc)   # V134: slots are UTC (see BRIEF_SLOTS_UTC)
     _live_slot = BRIEF.get("slot_id")
     _next_run_dt = _brief_next_run_dt(_now_ct)
     brf_next_iso = _next_run_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -6775,8 +6777,9 @@ def render_page(page="main"):
   #back-to-top:hover{{ background:#a6d4ff; }}
 
   /* V133: Global Trading Hub Overlap */
-  .th-axis{{ display:grid; grid-template-columns:repeat(8,1fr); font-family:var(--mn); font-size:10px;
-             color:var(--tx); padding-left:118px; border-bottom:1px solid var(--b); padding-bottom:5px; margin-bottom:8px; }}
+  .th-axis{{ display:grid; grid-template-columns:118px repeat(8,1fr); font-family:var(--mn); font-size:10px;
+             color:var(--tx); border-bottom:1px solid var(--b); padding-bottom:5px; margin-bottom:8px; }}
+  .th-zone{{ font-weight:800; letter-spacing:1px; color:var(--hdr); }}
   .th-row{{ display:grid; grid-template-columns:118px 1fr; align-items:center; padding:5px 0; }}
   .th-row + .th-row{{ border-top:1px solid rgba(26,32,48,.7); }}
   .th-name{{ display:flex; align-items:center; gap:6px; padding-right:10px; min-width:0; }}
@@ -6797,7 +6800,7 @@ def render_page(page="main"):
   .th-legend b{{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; }}
   @media(max-width:700px){{
     .th-row{{ grid-template-columns:88px 1fr; }}
-    .th-axis{{ padding-left:88px; font-size:9px; }}
+    .th-axis{{ grid-template-columns:88px repeat(8,1fr); font-size:9px; }}
     .th-city{{ font-size:11.5px; }}
   }}
 
