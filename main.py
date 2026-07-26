@@ -150,12 +150,12 @@ except Exception:
     CENTRAL = timezone(timedelta(hours=-6))  # CST fallback
 
 import requests
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, abort
 
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "137"
+APP_VERSION = "138"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3795,6 +3795,45 @@ def proprietary_feed_html(limit=8):
             directory, len(first), len(cover))
 
 
+# ── COMMUNITY MEME WALL (V138) ───────────────────────────────────────────────
+# Memes are embedded as base64 and served from their own cached routes -- the
+# same pattern already used for the header logo and the blog banner. The main
+# site deliberately has no POST routes and no user-writable storage, so there
+# is no upload form and no new attack surface: Rich sends a meme, it ships in
+# the next build.
+#
+# To add one, append a dict to MEMES:
+#   {"id": "short_slug", "caption": "Caption text", "credit": "@handle or None",
+#    "added": "2026-07-26", "b64": "<base64 png/jpg>"}
+# Newest-first ordering is by list position (append new ones at the top).
+MEMES = []
+
+
+def meme_wall_html():
+    if not MEMES:
+        return ('<div class="home-base"><div class="home-base-icon">\U0001F5BC\uFE0F</div>'
+                '<div class="home-base-title">The Wall Is Empty \u2014 For Now</div>'
+                '<div class="home-base-sub">XRP community memes will appear here as they are '
+                'added. Nothing is auto-scraped and nothing is placeholder art: every image on '
+                'this wall is one Rich has chosen and cleared.</div></div>')
+    cards = ""
+    for mm in MEMES:
+        cap = html.escape(mm.get("caption") or "")
+        cred = mm.get("credit")
+        meta = html.escape(mm.get("added") or "")
+        if cred:
+            meta += (" \u00B7 " if meta else "") + html.escape(cred)
+        cards += (
+            f'<figure class="meme-card">'
+            f'<a href="/meme/{html.escape(mm["id"], quote=True)}.png" target="_blank" rel="noopener">'
+            f'<img src="/meme/{html.escape(mm["id"], quote=True)}.png?v={APP_VERSION}" '
+            f'alt="{cap}" loading="lazy"></a>'
+            + (f'<figcaption class="meme-cap">{cap}</figcaption>' if cap else '')
+            + (f'<div class="meme-meta">{meta}</div>' if meta else '')
+            + '</figure>')
+    return f'<div class="meme-grid">{cards}</div>'
+
+
 def us_intelligence():
     """News-derived US briefing. (Upgrade point: swap internals for a Claude API call,
     keeping this computed version as the fallback.)"""
@@ -5801,6 +5840,10 @@ def render_page(page="main"):
     )
     us_ts = us["ts"] or "\u2014"
     gl_ts = gl["ts"] or "\u2014"
+    # V138: community meme wall
+    meme_html = meme_wall_html()
+    meme_count = len(MEMES)
+
     # V136: proprietary / official source feed (filtered from existing pool)
     pf_first, pf_cover, pf_dir, pf_nf, pf_nc = proprietary_feed_html()
 
@@ -6922,6 +6965,15 @@ def render_page(page="main"):
   /* FLOATING RETURN / BACK-TO-TOP */
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
+
+  /* V138: community meme wall */
+  .meme-grid{{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-top:12px; }}
+  .meme-card{{ margin:0; background:var(--s2); border:1px solid var(--b); border-radius:10px; overflow:hidden; }}
+  .meme-card img{{ width:100%; height:auto; display:block; }}
+  .meme-card a{{ display:block; }}
+  .meme-card:hover{{ border-color:rgba(224,68,124,.65); }}
+  .meme-cap{{ font-size:12.5px; color:var(--br); padding:9px 11px 0; line-height:1.45; }}
+  .meme-meta{{ font-family:var(--mn); font-size:10px; color:var(--tx); padding:4px 11px 10px; }}
 
   /* V136: proprietary source directory */
   .pf-dir{{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:8px; }}
@@ -8426,6 +8478,15 @@ def render_page(page="main"):
 
 """
 
+    _B['memes'] = f"""    <!-- SECTION 34: COMMUNITY MEME WALL (V138) -->
+    <div class="acct" style="border-color:rgba(224,68,124,.35);margin:10px 0">
+      <div class="sec-title" style="color:#E0447C"><span class="sic">\U0001F5BC\uFE0F</span> XRP Meme Wall</div>
+      <div class="trk-tag" style="color:var(--tx)">The lighter side of the ledger \u2014 community memes, hand-picked. {meme_count} on the wall.</div>
+      {meme_html}
+    </div>
+
+"""
+
     _B['community'] = f"""  <!-- XRP COMMUNITY HUB (V67) -->
     <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0 40px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
@@ -8536,7 +8597,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnav', 'regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'regulatory': ['regnav', 'regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -9014,6 +9075,20 @@ def logo_jpg():
     """The helix, served as embedded."""
     return Response(LOGO_BYTES, mimetype="image/jpeg",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.route("/meme/<mid>.png")
+def meme_png(mid):
+    for mm in MEMES:
+        if mm["id"] == mid:
+            try:
+                data = base64.b64decode(mm["b64"])
+            except Exception:
+                abort(404)
+            resp = Response(data, mimetype="image/png")
+            resp.headers["Cache-Control"] = "public, max-age=604800"
+            return resp
+    abort(404)
 
 
 @app.route("/blog_ad.png")
