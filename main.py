@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "132"
+APP_VERSION = "133"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3997,6 +3997,78 @@ def _fmt_local(dt, z):
     except ValueError:
         return dt.astimezone(z).strftime("%I:%M %p").lstrip("0")
 
+# Global Trading Hub Overlap (V133). Desk hours are 08:00-18:00 local in each
+# hub; offsets are read live from the tz database via _tz(), so DST shifts in
+# London, Zurich and New York are always current and nothing is hardcoded to a
+# season. Computed server-side using the same helper the World Clocks use.
+TRADING_HUBS = [
+    ("Singapore", "Asia/Singapore",   "asia"),
+    ("Hong Kong", "Asia/Hong_Kong",   "asia"),
+    ("Tokyo",     "Asia/Tokyo",       "asia"),
+    ("Seoul",     "Asia/Seoul",       "asia"),
+    ("Dubai",     "Asia/Dubai",       "bridge"),
+    ("Zurich",    "Europe/Zurich",    "europe"),
+    ("London",    "Europe/London",    "europe"),
+    ("New York",  "America/New_York", "americas"),
+]
+HUB_OPEN, HUB_CLOSE = 8, 18
+
+
+def trading_hub_overlap_html():
+    now = datetime.now(timezone.utc)
+    now_frac = now.hour + now.minute / 60.0
+    hubs = []
+    for city, tzname, region in TRADING_HUBS:
+        z = _tz(tzname)
+        try:
+            off = now.astimezone(z).utcoffset().total_seconds() / 3600.0
+        except Exception:
+            off = 0.0
+        start, end = (HUB_OPEN - off) % 24, (HUB_CLOSE - off) % 24
+        segs = [(start, end)] if start < end else [(start, 24.0), (0.0, end)]
+        hubs.append({"city": city, "region": region, "off": off, "segs": segs})
+
+    counts = [sum(1 for h in hubs for s, e in h["segs"] if s <= u < e) for u in range(24)]
+    max_c = max(counts) if counts else 0
+    best_start, best_len, cur_start, cur_len = 0, 0, -1, 0
+    for u in range(24):
+        if counts[u] == max_c:
+            if cur_start < 0:
+                cur_start, cur_len = u, 0
+            cur_len += 1
+            if cur_len > best_len:
+                best_len, best_start = cur_len, cur_start
+        else:
+            cur_start, cur_len = -1, 0
+    open_now = sum(1 for h in hubs for s, e in h["segs"] if s <= now_frac < e)
+
+    def fmt_off(o):
+        sign = "\u2212" if o < 0 else "+"
+        a = abs(o); whole = int(a); mins = int(round((a - whole) * 60))
+        return f"UTC{sign}{whole}" + (f":{mins:02d}" if mins else "")
+
+    rows = ""
+    for h in hubs:
+        bars = "".join(
+            f'<div class="th-bar {h["region"]}" style="left:{s/24*100:.4f}%;width:{(e-s)/24*100:.4f}%"></div>'
+            for s, e in h["segs"])
+        live = any(s <= now_frac < e for s, e in h["segs"])
+        dot = ('<span class="th-live" title="Desks staffed now"></span>' if live else
+               '<span class="th-live off" title="Outside desk hours"></span>')
+        rows += (
+            f'<div class="th-row">'
+            f'<div class="th-name">{dot}<span class="th-city">{h["city"]}</span>'
+            f'<span class="th-off">{fmt_off(h["off"])}</span></div>'
+            f'<div class="th-track">{bars}'
+            f'<div class="th-now" style="left:{now_frac/24*100:.4f}%"></div></div>'
+            f'</div>')
+
+    axis = "".join(f'<span>{u:02d}</span>' for u in range(0, 24, 3))
+    peak_end = (best_start + best_len) % 24
+    return (rows, axis, open_now, len(hubs), f"{best_start:02d}:00\u2013{peak_end:02d}:00",
+            max_c, f"{now.hour:02d}:{now.minute:02d}")
+
+
 def world_clocks_html():
     now_utc = datetime.now(timezone.utc)
     # V132: briefing times derive from BRIEF_SLOTS_UTC so the clocks can never
@@ -5757,6 +5829,9 @@ def render_page(page="main"):
     lvm_html = (_perf_card("1 Week", MARKET.get("perf_1w")) + _perf_card("30 Day", MARKET.get("perf_30d")) +
                 _perf_card("90 Day", MARKET.get("perf_90d")) + _perf_card("6 Month", MARKET.get("perf_6m")))
 
+    # V133: Global Trading Hub Overlap
+    th_rows, th_axis, th_open, th_total, th_peak, th_peak_n, th_utc = trading_hub_overlap_html()
+
     # Regional News Activity Heatmap
     rh_html = regional_heatmap_html()
 
@@ -6699,6 +6774,33 @@ def render_page(page="main"):
   #back-to-top{{ position:fixed; right:22px; bottom:22px; z-index:200; background:var(--bl); color:#000; border:none; border-radius:50%; width:46px; height:46px; font-size:17px; font-weight:900; cursor:pointer; box-shadow:0 0 14px rgba(117,188,255,.5); display:none; align-items:center; justify-content:center; line-height:1; }}
   #back-to-top:hover{{ background:#a6d4ff; }}
 
+  /* V133: Global Trading Hub Overlap */
+  .th-axis{{ display:grid; grid-template-columns:repeat(8,1fr); font-family:var(--mn); font-size:10px;
+             color:var(--tx); padding-left:118px; border-bottom:1px solid var(--b); padding-bottom:5px; margin-bottom:8px; }}
+  .th-row{{ display:grid; grid-template-columns:118px 1fr; align-items:center; padding:5px 0; }}
+  .th-row + .th-row{{ border-top:1px solid rgba(26,32,48,.7); }}
+  .th-name{{ display:flex; align-items:center; gap:6px; padding-right:10px; min-width:0; }}
+  .th-city{{ font-size:13px; font-weight:700; color:var(--br); white-space:nowrap; }}
+  .th-off{{ font-family:var(--mn); font-size:9.5px; color:var(--tx); white-space:nowrap; }}
+  .th-live{{ width:7px; height:7px; border-radius:50%; background:var(--gr); flex:0 0 auto;
+             box-shadow:0 0 6px rgba(72,255,130,.8); }}
+  .th-live.off{{ background:#33405a; box-shadow:none; }}
+  .th-track{{ position:relative; height:22px; background:var(--s2); border-radius:5px; overflow:hidden;
+              background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(100%/24 - 1px),rgba(26,32,48,.9) calc(100%/24 - 1px),rgba(26,32,48,.9) calc(100%/24)); }}
+  .th-bar{{ position:absolute; top:3px; height:16px; border-radius:4px; opacity:.92; }}
+  .th-bar.asia{{ background:var(--bl); }}
+  .th-bar.europe{{ background:var(--tq); }}
+  .th-bar.americas{{ background:var(--or); }}
+  .th-bar.bridge{{ background:linear-gradient(90deg,var(--bl),var(--tq)); }}
+  .th-now{{ position:absolute; top:0; bottom:0; width:2px; background:#fff; box-shadow:0 0 7px rgba(255,255,255,.75); z-index:3; }}
+  .th-legend{{ display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; font-size:12px; color:var(--tx); }}
+  .th-legend b{{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:5px; vertical-align:-1px; }}
+  @media(max-width:700px){{
+    .th-row{{ grid-template-columns:88px 1fr; }}
+    .th-axis{{ padding-left:88px; font-size:9px; }}
+    .th-city{{ font-size:11.5px; }}
+  }}
+
   /* V109: DCA Calculator, Historical Table, News Mention Volume */
   .dca-row{{ display:flex; justify-content:space-between; padding:4px 0; font-size:14px; color:var(--tx); }}
   .dca-row span:last-child{{ color:var(--br); font-weight:600; font-family:var(--mn); }}
@@ -6869,6 +6971,34 @@ def render_page(page="main"):
 
 """
 
+    _B['tradinghub'] = f"""    <!-- SECTION 31: GLOBAL TRADING HUB OVERLAP (V133) -->
+    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F310</span> Global Trading Hub Overlap</div>
+      <div class="trk-tag" style="color:var(--tx)">Crypto never closes, so these are not exchange hours \u2014 they are the windows when each hub's desks are actually staffed (08:00\u201318:00 local). Where the windows stack is where depth concentrates and spreads tighten.</div>
+      <div class="srow" style="margin:12px 0 14px">
+        <div class="si"><span style="color:var(--tx);font-size:13px">Staffed right now</span><span style="color:var(--gr);font-weight:800;font-family:var(--mn)">{th_open} / {th_total}</span></div>
+        <div class="si"><span style="color:var(--tx);font-size:13px">Peak overlap</span><span style="color:var(--or);font-weight:800;font-family:var(--mn)">{th_peak} UTC</span></div>
+        <div class="si"><span style="color:var(--tx);font-size:13px">Hubs at peak</span><span style="color:var(--bl);font-weight:800;font-family:var(--mn)">{th_peak_n} / {th_total}</span></div>
+      </div>
+      <div class="th-axis">{th_axis}</div>
+      {th_rows}
+      <div class="th-legend">
+        <span><b style="background:var(--bl)"></b>Asia\u2013Pacific</span>
+        <span><b style="background:linear-gradient(90deg,var(--bl),var(--tq))"></b>Gulf bridge</span>
+        <span><b style="background:var(--tq)"></b>Europe</span>
+        <span><b style="background:var(--or)"></b>Americas</span>
+        <span><b style="background:#fff"></b>Now ({th_utc} UTC)</span>
+      </div>
+      <div style="font-size:12px;color:var(--tx);margin-top:12px;line-height:1.7;border-top:1px solid var(--b);padding-top:10px">
+        Bars run 08:00\u201318:00 local mapped onto one UTC day; a bar crossing midnight UTC is drawn in two pieces \u2014 the same window split by the date line, not two sessions.
+        Dubai is shaded blue-to-turquoise because the Gulf sits between the Asian close and the European open, carrying flow that would otherwise fall into a gap.
+        Offsets are read live from the time-zone database, so daylight saving in London, Zurich and New York is already accounted for.
+        <strong style="color:var(--br)">Breadth, not volume:</strong> four of these eight hubs sit in Asia\u2013Pacific and only one in the Americas, so the widest overlap is not the heaviest flow \u2014 the later London\u2013New York window carries far more. Not financial advice.
+      </div>
+    </div>
+
+"""
+
     _B['rsi'] = f"""    <!-- SECTION 3: RSI / Support-Resistance / Time Machine / 52-Week -->
     <div class="grid2">
       <!-- LEFT COLUMN: RSI + 52-Week -->
@@ -6947,7 +7077,7 @@ def render_page(page="main"):
     _B['chart'] = f"""    <!-- SECTION 4: LIVE XRP/USD CHART -->
     <div class="acct" style="padding:10px;border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4CA</span> Live XRP/USD Chart</div>
-      <div style="height:440px;border-radius:8px;overflow:hidden;border:1px solid var(--b)">
+      <div style="height:520px;border-radius:8px;overflow:hidden;border:1px solid var(--b)">
         <div class="tradingview-widget-container" style="width:100%;height:100%">
           <div class="tradingview-widget-container__widget" style="width:100%;height:100%"></div>
           <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
@@ -8155,7 +8285,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
