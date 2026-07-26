@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "131"
+APP_VERSION = "132"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -2404,7 +2404,7 @@ threading.Thread(target=_bg_news, daemon=True).start()
 def _bg_brief():
     while True:
         try:
-            slot_id, _ = _brief_slot(datetime.now(CENTRAL))
+            slot_id, _ = _brief_slot(datetime.now(timezone.utc))
             if BRIEF["slot_id"] != slot_id:
                 generate_brief()
         except Exception:
@@ -3229,6 +3229,54 @@ def _detect_partnership_deals(pool):
             "source": "detected", "link": s.get("link"),
         })
 
+def recent_partnerships_html(days=7):
+    """MAIN page: only partnerships / TradFi deals detected in the last `days`.
+
+    Ageing is implicit, not a separate store: this view and the full Global
+    Partnership Directory on the Institutional page both read the same
+    PARTNERSHIP_LEDGER. Once an entry passes the window it simply stops
+    matching here and continues to appear in the Directory -- so nothing is
+    ever moved, copied or lost, and nothing is ever backdated."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    recent = []
+    for e in PARTNERSHIP_LEDGER:
+        if e.get("source") != "detected" or not e.get("date"):
+            continue
+        try:
+            if e["date"].astimezone(timezone.utc) >= cutoff:
+                recent.append(e)
+        except Exception:
+            continue
+    recent.sort(key=lambda e: e["date"], reverse=True)
+
+    if not recent:
+        return ('<div class="home-base"><div class="home-base-icon">\U0001F91D</div>'
+                '<div class="home-base-title">No New Deals in the Last 7 Days</div>'
+                '<div class="home-base-sub">This section fills automatically as new '
+                'partnerships and traditional-finance deals are detected from the live '
+                'feed. Nothing is backdated or invented \u2014 an empty week is reported '
+                'as an empty week. The complete history stays in the Global Partnership '
+                'Directory on the <a href="/institutional" style="color:var(--hdr)">'
+                'Institutional</a> page.</div></div>')
+
+    out = ""
+    for e in recent:
+        col = ENTERPRISE_CATEGORY_COLORS.get(e["cat"], "var(--tx)")
+        title_html = (f'<a href="{html.escape(e["link"] or "#", quote=True)}" target="_blank" rel="noopener">'
+                      f'{html.escape(e["name"])}</a>') if e.get("link") else html.escape(e["name"])
+        out += (
+            f'<div class="pl-row">'
+            f'<div class="pl-top"><span class="pl-cat" style="color:{col}">'
+            f'{ENTERPRISE_CATEGORY_LABELS.get(e["cat"], "\U0001F195 New Deal")}</span>'
+            f'<span class="pl-new">\U0001F195 NEW</span>'
+            f'<span class="pl-status" style="color:{col}">{html.escape(e["status"])}</span>'
+            f'<span class="pl-when">{_time_ago(e["date"])}</span></div>'
+            f'<div class="pl-name">{title_html}</div>'
+            f'<div class="pl-meta">{html.escape(e["detail"][:140])}</div>'
+            f'</div>')
+    return out
+
+
 def partnership_ledger_html(limit=30):
     detected = sorted((e for e in PARTNERSHIP_LEDGER if e["source"] == "detected"),
                        key=lambda e: e["date"], reverse=True)
@@ -3773,31 +3821,36 @@ _BRIEF_THEMES = {
     "CBDC / Sovereign": ["cbdc", "central bank", "sovereign", "digital currency"],
 }
 
-def _brief_slot(now_ct):
-    d = now_ct.date()
-    h = now_ct.hour
-    if h >= 21:
-        return f"{d.isoformat()}-PM", "PM"
-    if h >= 12:
-        return f"{d.isoformat()}-AM", "AM"
-    yd = (now_ct - timedelta(days=1)).date()
-    return f"{yd.isoformat()}-PM", "PM"
+# V132: four editions per day, on UTC. Slot times are the single source of
+# truth -- _brief_slot, _brief_next_run_dt, the countdown timer and the
+# on-page copy all derive from this list.
+BRIEF_SLOTS_UTC = [(6, 0), (11, 55), (18, 0), (23, 55)]
 
-def _brief_next_run_dt(now_ct):
-    h = now_ct.hour
-    if h < 12:
-        return now_ct.replace(hour=12, minute=0, second=0, microsecond=0)
-    elif h < 21:
-        return now_ct.replace(hour=21, minute=0, second=0, microsecond=0)
-    else:
-        return (now_ct + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
+def _brief_slot(now_utc):
+    """Return (slot_id, edition_label) for the edition currently in force."""
+    d = now_utc.date()
+    mins_now = now_utc.hour * 60 + now_utc.minute
+    chosen = None
+    for h, mi in BRIEF_SLOTS_UTC:
+        if mins_now >= h * 60 + mi:
+            chosen = (h, mi)
+    if chosen is None:
+        # Before the day's first slot -- the last edition of yesterday still stands.
+        d = (now_utc - timedelta(days=1)).date()
+        chosen = BRIEF_SLOTS_UTC[-1]
+    h, mi = chosen
+    return f"{d.isoformat()}-{h:02d}{mi:02d}", f"{h:02d}:{mi:02d} UTC"
 
-def _brief_next_run(now_ct):
-    nxt = _brief_next_run_dt(now_ct)
-    try:
-        return nxt.strftime("%b %d, %-I:%M %p CST")
-    except ValueError:
-        return nxt.strftime("%b %d, %I:%M %p CST")
+def _brief_next_run_dt(now_utc):
+    mins_now = now_utc.hour * 60 + now_utc.minute
+    for h, mi in BRIEF_SLOTS_UTC:
+        if mins_now < h * 60 + mi:
+            return now_utc.replace(hour=h, minute=mi, second=0, microsecond=0)
+    h, mi = BRIEF_SLOTS_UTC[0]
+    return (now_utc + timedelta(days=1)).replace(hour=h, minute=mi, second=0, microsecond=0)
+
+def _brief_next_run(now_utc):
+    return _brief_next_run_dt(now_utc).strftime("%b %d, %H:%M UTC")
 
 def _brief_sections(pool):
     total = len(pool)
@@ -3881,15 +3934,12 @@ def _brief_sections(pool):
             "regional": regional, "watchlist": watchlist, "tradfi": tradfi}
 
 def generate_brief():
-    now_ct = datetime.now(CENTRAL)
-    slot_id, edition = _brief_slot(now_ct)
+    now_utc = datetime.now(timezone.utc)
+    slot_id, edition = _brief_slot(now_utc)
     BRIEF["slot_id"] = slot_id
     BRIEF["edition"] = edition
-    try:
-        BRIEF["generated"] = now_ct.strftime("%b %d, %Y \u00B7 %-I:%M %p CST")
-    except ValueError:
-        BRIEF["generated"] = now_ct.strftime("%b %d, %Y \u00B7 %I:%M %p CST")
-    BRIEF["next_run"] = _brief_next_run(now_ct)
+    BRIEF["generated"] = now_utc.strftime("%b %d, %Y \u00B7 %H:%M UTC")
+    BRIEF["next_run"] = _brief_next_run(now_utc)
     BRIEF["sections"] = _brief_sections(NEWS.get("pool", []))
 
     BRIEF_ARCHIVE[slot_id] = {
@@ -3949,9 +3999,11 @@ def _fmt_local(dt, z):
 
 def world_clocks_html():
     now_utc = datetime.now(timezone.utc)
-    ct = datetime.now(CENTRAL)
-    b1 = ct.replace(hour=12, minute=0, second=0, microsecond=0)   # 12:00 PM CST edition
-    b2 = ct.replace(hour=21, minute=0, second=0, microsecond=0)   # 9:00 PM CST edition
+    # V132: briefing times derive from BRIEF_SLOTS_UTC so the clocks can never
+    # drift out of sync with the actual publishing schedule.
+    _base = now_utc.replace(second=0, microsecond=0)
+    _slots = [_base.replace(hour=h, minute=mi) for h, mi in BRIEF_SLOTS_UTC]
+    _ord = ["1st", "2nd", "3rd", "4th", "5th", "6th"]
     out = ""
     for city, tzname in WORLD_CITIES:
         z = _tz(tzname)
@@ -3971,9 +4023,9 @@ def world_clocks_html():
             f'<span class="wc-center"></span>'
             f'</div>'
             f'<div class="wc-off">UTC {off_disp}</div>'
-            f'<div class="wc-b">1st {_fmt_local(b1, z)}</div>'
-            f'<div class="wc-b">2nd {_fmt_local(b2, z)}</div>'
-            f'</div>'
+            + "".join(f'<div class="wc-b">{_ord[i]} {_fmt_local(s, z)}</div>'
+                       for i, s in enumerate(_slots))
+            + f'</div>'
         )
     return out
 
@@ -5753,6 +5805,9 @@ def render_page(page="main"):
 
     # Global XRP Enterprise & Partnership Ledger
     pl_html = partnership_ledger_html()
+    # V132: MAIN-page "new this week" view over the same ledger
+    nd_html = recent_partnerships_html(days=7)
+    nd_count = nd_html.count('class="pl-row"')
     pl_total = len(PARTNERSHIP_LEDGER)
     pl_detected = sum(1 for e in PARTNERSHIP_LEDGER if e["source"] == "detected")
 
@@ -6938,6 +6993,11 @@ def render_page(page="main"):
           </div>
         </div>
       </div>
+      <div class="am-panel" style="margin-top:10px">
+        <div class="am-title" style="color:var(--tq)">\U0001F4A7 Liquidity Map</div>
+        <div class="am-sub">Bid vs. ask value in the visible order book</div>
+        {liq_html}
+      </div>
       <div style="font-size:12px;color:var(--tx);margin-top:8px;letter-spacing:0.5px">
         \U0001F4A7 Global aggregate read (not single-exchange) &bull; source: CoinPaprika &bull; refreshes automatically every 5 minutes
       </div>
@@ -7296,13 +7356,13 @@ def render_page(page="main"):
 
 """
 
-    _B['brief'] = f"""    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (twice daily — AM 12:00 PM CST, PM 9:00 PM CST) -->
+    _B['brief'] = f"""    <!-- SECTION 17: XRP INTELLIGENCE BRIEF (four editions daily — 06:00, 11:55, 18:00, 23:55 UTC) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr);margin-bottom:10px"><span class="sic">\U0001F52E</span> XRP Intelligence Brief</div>
 
       <div class="brf-teaser">
         <div class="brf-teaser-line">\U0001F52E Next Proprietary Briefing in <span id="brf-countdown">\u2014</span></div>
-        <div class="brf-teaser-sub">Twice daily \u2014 12:00 PM &amp; 9:00 PM CST \u2014 see World Clocks below</div>
+        <div class="brf-teaser-sub">Four editions daily \u2014 06:00 &bull; 11:55 &bull; 18:00 &bull; 23:55 UTC \u2014 see World Clocks below</div>
       </div>
 
       <div class="brf-now-showing" id="brf-now-showing">
@@ -7320,7 +7380,7 @@ def render_page(page="main"):
         <div class="brf-block"><div class="brf-t"><span style="font-size:17px">\U0001F441\uFE0F</span> Watchlist</div><div class="brf-x" id="brf-watchlist">{brf_watch}</div></div>
         <div class="brf-block"><div class="brf-t"><span style="font-size:17px">\U0001F3DB\uFE0F</span> TradFi Integration Outlook</div><div class="brf-x" id="brf-tradfi">{brf_tradfi}</div></div>
       </div>
-      <div class="brf-note">\u26A0\uFE0F Informational only \u2014 not financial advice. Editions publish at 12:00 PM and 9:00 PM CST and are derived from the live news feed.</div>
+      <div class="brf-note">\u26A0\uFE0F Informational only \u2014 not financial advice. Editions publish at 06:00, 11:55, 18:00 and 23:55 UTC and are derived from the live news feed.</div>
     </div>
     <script type="application/json" id="brief-archive-data">{_archive_json}</script>
 
@@ -7329,7 +7389,7 @@ def render_page(page="main"):
     _B['clocks'] = f"""    <!-- SECTION 18: WORLD BRIEFING CLOCKS -->
     <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F310</span> World Briefing Clocks</div>
-      <div class="trk-tag" style="color:var(--tx)">Local time across major crypto hubs, with each city's 1st (12:00 PM CST) and 2nd (9:00 PM CST) briefing time \u2014 orange by day, gray by night.</div>
+      <div class="trk-tag" style="color:var(--tx)">Local time across major crypto hubs, showing all four daily briefing editions (06:00 &bull; 11:55 &bull; 18:00 &bull; 23:55 UTC) in each city's own time \u2014 orange by day, gray by night.</div>
       <div class="wc-row">
         {wc_html}
       </div>
@@ -7574,6 +7634,17 @@ def render_page(page="main"):
 
 """
 
+    _B['newdeals'] = f"""    <!-- SECTION 27b: NEW PARTNERSHIPS & DEALS \u2014 LAST 7 DAYS (V132) -->
+    <div class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--gr)"><span class="sic">\U0001F91D</span> New Partnerships &amp; Deals \u2014 This Week</div>
+      <div class="trk-tag" style="color:var(--tx)">Only partnerships and traditional-finance deals detected in the last 7 days \u2014 {nd_count} currently listed. Updates automatically as the feed runs; entries older than a week roll into the <a href="/institutional" style="color:var(--hdr)">Global Partnership Directory</a>.</div>
+      <div class="pl-list" style="margin-top:10px">
+        {nd_html}
+      </div>
+    </div>
+
+"""
+
     _B['enterprise'] = f"""    <!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
@@ -7675,11 +7746,6 @@ def render_page(page="main"):
           <div class="am-sub">Live bid/ask walls on Binance XRP/USDT \u2014 top 8 levels each side</div>
           {ob_body_html}
         </div>
-      </div>
-      <div class="am-panel" style="margin-top:10px">
-        <div class="am-title" style="color:var(--tq)">\U0001F4A7 Liquidity Map</div>
-        <div class="am-sub">Bid vs. ask value in the visible order book</div>
-        {liq_html}
       </div>
     </div>
 
@@ -8089,7 +8155,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'competitive', 'regradar', 'clarity', 'enterprise', 'advmetrics', 'regledger'], 'markets': ['rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'clocks', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['top20', 'usintel', 'regdisc', 'newsfeed', 'heatmap', 'sentiment', 'nmv'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
