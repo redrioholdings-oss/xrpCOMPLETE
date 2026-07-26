@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "141"
+APP_VERSION = "142"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -5103,7 +5103,7 @@ ECOSYSTEM_CARDS = [
     {"ic": "\U0001F48E", "name": "XRP", "role": "The Asset", "color": "var(--gr)",
      "bg": "rgba(72,255,130,.06)", "bd": "rgba(72,255,130,.3)",
      "desc": "Native digital asset of the XRPL. Used as bridge currency in ODL, transaction gas, and wallet reserve. Fixed supply of 100 billion \u2014 no mining, no inflation. Burned slightly with every transaction.",
-     "stats": [("Total Supply", "100B XRP"), ("Circulating", "~62B XRP"), ("In Escrow", "~43B XRP")]},
+     "stats": [("Total Supply", "100B XRP"), ("Circulating", "~62B XRP"), ("In Escrow", "~38.2B XRP")]},
     {"ic": "\U0001F310", "name": "RippleNet", "role": "The Network", "color": "var(--or)",
      "bg": "rgba(255,153,0,.06)", "bd": "rgba(255,153,0,.3)",
      "desc": "Ripple's B2B payment network connecting 300+ financial institutions globally. Three tiers: Direct (messaging), Multi-hop (routing), and ODL (XRP bridge). Banks choose their level of XRP integration.",
@@ -8034,7 +8034,7 @@ def render_page(page="main"):
           <div class="rail-row"><span class="rail-k">Ledger Close</span><span class="rail-v">~3-5 seconds</span></div>
           <div class="rail-row"><span class="rail-k">Tx Fee</span><span class="rail-v">~0.00001 XRP</span></div>
           <div class="rail-row"><span class="rail-k">Circulating</span><span class="rail-v" style="color:var(--gr)">62.2B XRP</span></div>
-          <div class="rail-row"><span class="rail-k">Escrow Locked</span><span class="rail-v">~43B XRP</span></div>
+          <div class="rail-row"><span class="rail-k">Escrow Locked</span><span class="rail-v">~38.2B XRP</span></div>
           <div class="rail-row"><span class="rail-k">Total Supply</span><span class="rail-v">100B XRP</span></div>
         </div>
         <div class="rail-panel">
@@ -8606,12 +8606,39 @@ def render_page(page="main"):
                 <div style="font-size:12px;color:var(--tx);margin-bottom:8px">Next scheduled release (1B XRP, 1st of month 00:00 UTC):</div>
                 <div id="esc-countdown" data-eta="{esc_iso}" style="font-size:22px;font-weight:900;font-family:var(--mn);color:var(--bl);margin-bottom:8px">\u2014</div>
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);border-top:1px solid var(--b);padding-top:8px">
-                  <span>Total in escrow</span><span style="color:var(--br);font-weight:700">~43B XRP</span>
+                  <span>Originally locked (Dec 2017)</span><span style="color:var(--br);font-weight:700">55B XRP</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
-                  <span>Circulating supply</span><span style="color:var(--br);font-weight:700">~62B XRP</span>
+                  <span>Still in escrow</span><span style="color:var(--br);font-weight:700">~38.2B XRP</span>
                 </div>
-                <div style="font-size:12px;color:var(--tx);margin-top:8px;font-style:italic">Escrow addresses are public and independently verifiable on-chain \u2014 this is Ripple's own locked supply, not a personal wallet lookup.</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
+                  <span>Net released to date</span><span style="color:var(--br);font-weight:700">~16.8B XRP</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
+                  <span>Circulating supply</span><span style="color:var(--br);font-weight:700">~61.9B XRP</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tx);margin-top:4px">
+                  <span>Locked share of total supply</span><span style="color:var(--br);font-weight:700">~38%</span>
+                </div>
+                <div style="height:7px;background:var(--s1);border-radius:4px;overflow:hidden;margin-top:8px">
+                  <div style="height:100%;width:30.5%;background:var(--bl)"></div>
+                </div>
+                <div style="font-size:11px;color:var(--tx);margin-top:4px">Roughly 31% of the original 55B escrow has been released and not re-locked.</div>
+                <div style="font-size:12px;color:var(--tx);margin-top:10px;border-top:1px solid var(--b);padding-top:8px;line-height:1.6">
+                  <b style="color:var(--br)">A 1B unlock is not 1B sold.</b> Ripple typically re-escrows most of each
+                  month's release, so only the retained portion can reach the market. The June 2026 unlock moved in
+                  three transfers (500M / 400M / 100M).
+                </div>
+                <div style="font-size:12px;color:var(--tx);margin-top:8px;line-height:1.6">
+                  <b style="color:var(--br)">Effect on price is not clear-cut.</b> The schedule is public years in
+                  advance, most tokens are re-locked, and the net release is small next to daily volume \u2014 there is
+                  little evidence of a consistent price effect around release dates.
+                </div>
+                <div style="font-size:12px;color:var(--tx);margin-top:8px;line-height:1.6">
+                  <b style="color:var(--br)">No burn, no buyback.</b> Ripple buys back its own private shares, not XRP,
+                  and has declined community proposals to burn the escrow.
+                </div>
+                <div style="font-size:12px;color:var(--tx);margin-top:8px;font-style:italic;border-top:1px solid var(--b);padding-top:8px">Escrow addresses are public and independently verifiable on-chain \u2014 this is Ripple's own locked supply, not a personal wallet lookup. Balances are approximate and move with each monthly cycle; exhaustion timing is genuinely uncertain because of re-escrowing.</div>
               </div>
             </div>
           </div>
