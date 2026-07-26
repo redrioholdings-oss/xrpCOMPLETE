@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "136"
+APP_VERSION = "137"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -6956,6 +6956,8 @@ def render_page(page="main"):
   .intel-foot{{ font-size:11px; color:var(--tx); margin-top:12px; border-top:1px solid var(--b); padding-top:8px; }}
   @media(max-width:700px){{ .ib-row{{ grid-template-columns:82px 1fr 24px; }} }}
 
+  .srow-2{{ grid-template-columns:repeat(2,1fr); }}
+  @media(max-width:700px){{ .srow-2{{ grid-template-columns:1fr; }} }}
   .nav-marker{{ text-decoration:none; transition:border-color .15s, background .15s; }}
   .nav-marker:hover{{ border-color:rgba(3,177,252,.7)!important; background:#1b2537; }}
   /* V133: Global Trading Hub Overlap */
@@ -8376,7 +8378,7 @@ def render_page(page="main"):
 """
 
     _B['regledger'] = f"""  <!-- REGULATORY & LEDGER WATCH (V66) -->
-    <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
+    <div id="regledger" class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F4E1</span> Regulatory &amp; Ledger Watch</div>
         <div style="font-size:12px;color:var(--tx);font-family:var(--mn);padding-top:4px">Updated: {rw_updated}</div>
@@ -8401,6 +8403,20 @@ def render_page(page="main"):
           {rw_fedreg}
         </div>
       </div>
+    </div>
+
+"""
+
+    _B['regnav'] = f"""    <!-- SECTION 33: REGULATORY -> MAIN QUICK MARKERS (V137) -->
+    <div class="srow srow-2" style="margin:10px 0 14px">
+      <a class="si nav-marker" href="/#regradar">
+        <span><span class="sic" style="font-size:17px">\U0001F4E1</span> <b style="color:var(--br)">Regulatory Radar</b><br><span style="font-size:12px;color:var(--tx)">Live regulatory signal tracking \u2014 on Main</span></span>
+        <span style="color:var(--hdr);font-weight:800">&rarr;</span>
+      </a>
+      <a class="si nav-marker" href="/#regledger">
+        <span><span class="sic" style="font-size:17px">\U0001F4DC</span> <b style="color:var(--br)">Regulatory &amp; Ledger Watch</b><br><span style="font-size:12px;color:var(--tx)">Rule changes &amp; ledger governance \u2014 on Main</span></span>
+        <span style="color:var(--hdr);font-weight:800">&rarr;</span>
+      </a>
     </div>
 
 """
@@ -8520,7 +8536,7 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnew']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'instpart', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community'], 'regulatory': ['regnav', 'regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
