@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "146"
+APP_VERSION = "147"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -4371,48 +4371,81 @@ def _brief_sections(pool):
         return {k: msg for k in ["pulse", "connections", "domino", "regional", "watchlist", "tradfi"]}
     bull = sum(1 for s in pool if s["sentiment"] == "bullish")
     bear = sum(1 for s in pool if s["sentiment"] == "bearish")
+    neut = total - bull - bear
     lean = "bullish" if bull > bear else "bearish" if bear > bull else "balanced"
     chg = MARKET.get("xrp_chg")
     dir_txt = ("up" if (chg or 0) >= 0 else "down") + (f" {abs(chg):.2f}% over 24h" if chg is not None else "")
     fng = MARKET.get("fng")
     fng_txt = (f"Fear & Greed reads {fng} ({MARKET.get('fng_label', '')})" if fng is not None
                else "Fear & Greed is unavailable")
+    n_sources = len({s["source"] for s in pool})
+    breaking_n = sum(1 for s in pool if s.get("breaking"))
+    cat_rows = _rank_counts([s.get("category") for s in pool if s.get("category")])
 
-    pulse = (f"The tape carries {total} XRP stor{'y' if total == 1 else 'ies'} this edition, leaning {lean} "
-             f"({bull} bullish, {bear} bearish). {fng_txt}; XRP is {dir_txt}.")
+    # V147: PULSE \u2014 added source diversity, breaking-story count, and the
+    # single busiest coverage category, all real counts over the same pool.
+    pulse = (f"The tape carries {total} XRP stor{'y' if total == 1 else 'ies'} this edition across "
+             f"{n_sources} distinct source{'s' if n_sources != 1 else ''}, leaning {lean} "
+             f"({bull} bullish, {bear} bearish, {neut} neutral). {fng_txt}; XRP is {dir_txt}.")
+    if breaking_n:
+        pulse += f" {breaking_n} stor{'y is' if breaking_n == 1 else 'ies are'} flagged breaking."
+    if cat_rows:
+        top_cat, top_cat_n = cat_rows[0]
+        pulse += f" Coverage concentrates in {top_cat} ({top_cat_n} of {total})."
 
     theme_hits = []
     for name, kws in _BRIEF_THEMES.items():
         stories = [s for s in pool if any(k in (s["title"] + " " + s.get("summary", "")).lower() for k in kws)]
         if stories:
             srcs = len({s["source"] for s in stories})
-            theme_hits.append((name, len(stories), srcs))
+            b = sum(1 for s in stories if s["sentiment"] == "bullish")
+            r = sum(1 for s in stories if s["sentiment"] == "bearish")
+            lead_story = sorted(stories, key=lambda s: s["influence"], reverse=True)[0]
+            theme_hits.append((name, len(stories), srcs, b, r, lead_story))
     theme_hits.sort(key=lambda t: (t[1], t[2]), reverse=True)
+
+    # V147: CONNECTIONS \u2014 now names the actual leading headline behind the
+    # dominant thread and gives each runner-up its own sentiment split, instead
+    # of just a story/outlet count.
     if theme_hits:
-        parts = [f"{n} ({c} stor{'y' if c == 1 else 'ies'} across {sc} outlet{'s' if sc != 1 else ''})"
-                 for n, c, sc in theme_hits[:3]]
-        connections = "The dominant thread is " + parts[0]
-        if len(parts) > 1:
-            connections += ", followed by " + " and ".join(parts[1:])
-        connections += ". Cross-outlet convergence suggests the narrative is broadening, not isolated."
+        n, c, sc, b, r, lead_story = theme_hits[0]
+        connections = (f"The dominant thread is {n} ({c} stor{'y' if c == 1 else 'ies'} across "
+                       f"{sc} outlet{'s' if sc != 1 else ''}, {b} bullish / {r} bearish). "
+                       f"Leading it: \u201c{html.escape(lead_story['title'][:100])}\u201d ({html.escape(lead_story['source'])}).")
+        if len(theme_hits) > 1:
+            runners = "; ".join(
+                f"{n2} ({c2}, {'bullish' if b2 > r2 else 'bearish' if r2 > b2 else 'even'})"
+                for n2, c2, sc2, b2, r2, _ in theme_hits[1:3])
+            connections += f" Also active: {runners}."
+        connections += " Cross-outlet convergence suggests the narrative is broadening, not isolated."
     else:
         connections = "Coverage is fragmented with no single dominant thread this edition."
 
+    # V147: DOMINO \u2014 added a concrete numeric trigger condition and, when
+    # one exists, names the second-place theme as the alternate catalyst to watch.
     if theme_hits:
         lead = theme_hits[0][0]
+        runner_up = theme_hits[1][0] if len(theme_hits) > 1 else None
         if lean == "bullish":
-            domino = (f"If {lead} momentum holds, expect follow-through buying and secondary coverage from lagging "
-                      f"outlets; watch for confirmation in price and volume.")
+            domino = (f"If {lead} momentum holds ({bull} of {total} stories bullish today), expect follow-through "
+                      f"buying and secondary coverage from lagging outlets; watch for confirmation in price and volume.")
         elif lean == "bearish":
-            domino = (f"With sentiment tilting bearish around {lead}, near-term downside headlines could compound; "
-                      f"a single positive catalyst would be needed to reverse the tone.")
+            domino = (f"With sentiment tilting bearish around {lead} ({bear} of {total} stories bearish today), "
+                      f"near-term downside headlines could compound; a single positive catalyst would be needed "
+                      f"to reverse the tone.")
         else:
-            domino = (f"{lead} is driving the cycle but sentiment is balanced \u2014 the next major headline likely "
-                      f"sets direction; until then, expect a range-bound reaction.")
+            domino = (f"{lead} is driving the cycle but sentiment is balanced ({bull} bullish vs {bear} bearish) "
+                      f"\u2014 the next major headline likely sets direction; until then, expect a range-bound reaction.")
+        if runner_up:
+            domino += f" {runner_up} is the clearest alternate catalyst if {lead} stalls."
     else:
         domino = "No clear catalyst chain this edition; the market is between stories and likely to drift."
 
     reg_rows = _rank_counts([s["region"] for s in pool if s.get("region")])
+    # V147: REGIONAL \u2014 each region now cites its own leading headline, and
+    # the section states how many of the tracked regions are active vs quiet.
+    n_regions_tracked = len(REGIONS)
+    n_regions_active = len(reg_rows)
     if reg_rows:
         parts = []
         for reg, cnt in reg_rows[:3]:
@@ -4420,25 +4453,48 @@ def _brief_sections(pool):
             b = sum(1 for s in rs if s["sentiment"] == "bullish")
             r = sum(1 for s in rs if s["sentiment"] == "bearish")
             sig = "bullish" if b > r else "bearish" if r > b else "neutral"
-            parts.append(f"{REGION_FLAGS.get(reg, '')} {reg} ({cnt}, {sig})")
-        regional = "Regional activity concentrates in " + ", ".join(parts) + ". Other regions are quiet."
+            top = sorted(rs, key=lambda s: s["influence"], reverse=True)[0]
+            parts.append(f"{REGION_FLAGS.get(reg, '')} {reg} ({cnt}, {sig}) \u2014 "
+                        f"\u201c{html.escape(top['title'][:70])}\u201d")
+        regional = (f"{n_regions_active} of {n_regions_tracked} tracked regions active this edition. "
+                   "Regional activity concentrates in " + "; ".join(parts) + ".")
     else:
         regional = "No regional flashpoints \u2014 coverage is US and global-centric this edition."
 
-    watch = sorted(pool, key=lambda s: s["influence"], reverse=True)[:4]
+    # V147: WATCHLIST \u2014 extended from 4 to 6 stories and each now shows
+    # sentiment and recency alongside title/source, not just a bare list.
+    watch = sorted(pool, key=lambda s: s["influence"], reverse=True)[:6]
     if watch:
-        items = "; ".join(f"({i}) {html.escape(s['title'])} \u2014 {html.escape(s['source'])}"
-                          for i, s in enumerate(watch, 1))
-        watchlist = "Highest-signal stories to watch: " + items + "."
+        dot = {"bullish": "\u25B2", "bearish": "\u25BC", "neutral": "\u25CF"}
+        items = "; ".join(
+            f"({i}) {dot.get(s['sentiment'], '\u25CF')} {html.escape(s['title'])} \u2014 "
+            f"{html.escape(s['source'])}, {_time_ago(s['dt'])}"
+            for i, s in enumerate(watch, 1))
+        watchlist = f"Highest-signal stories to watch ({len(watch)}): " + items + "."
     else:
         watchlist = "No standout stories to flag this edition."
 
-    tradfi_kw = {"etf", "bank", "custody", "sec", "institutional", "nasdaq", "blackrock", "fidelity", "swift", "settlement"}
-    tf = [s for s in pool if any(k in (s["title"] + " " + s.get("summary", "")).lower() for k in tradfi_kw)]
-    if tf:
-        tradfi = (f"{len(tf)} stor{'y' if len(tf) == 1 else 'ies'} touch traditional-finance integration "
-                  f"(ETFs, banks, regulators, settlement rails). Institutional plumbing remains the structural story "
-                  f"beneath the daily price noise.")
+    # V147: TRADFI \u2014 broken into its actual sub-categories (ETF/custody,
+    # banking, regulatory/SEC) with real per-bucket counts, plus the leading
+    # headline, instead of one aggregate count.
+    tradfi_buckets = {
+        "ETF & custody": {"etf", "custody", "blackrock", "fidelity", "nasdaq"},
+        "Banking & settlement": {"bank", "swift", "settlement"},
+        "Regulatory": {"sec", "institutional"},
+    }
+    tf_all, tf_parts = [], []
+    for label, kws in tradfi_buckets.items():
+        matched = [s for s in pool if any(k in (s["title"] + " " + s.get("summary", "")).lower() for k in kws)]
+        tf_all.extend(matched)
+        if matched:
+            tf_parts.append(f"{label} ({len(matched)})")
+    tf_all = list({s['key']: s for s in tf_all}.values())  # de-dup stories matching multiple buckets
+    if tf_all:
+        top_tf = sorted(tf_all, key=lambda s: s["influence"], reverse=True)[0]
+        tradfi = (f"{len(tf_all)} stor{'y' if len(tf_all) == 1 else 'ies'} touch traditional-finance integration: "
+                 + ", ".join(tf_parts) + f". Leading: \u201c{html.escape(top_tf['title'][:90])}\u201d "
+                 f"({html.escape(top_tf['source'])}). Institutional plumbing remains the structural story "
+                 f"beneath the daily price noise.")
     else:
         tradfi = "Quiet on traditional-finance integration this edition; watch for ETF and banking headlines next cycle."
 
