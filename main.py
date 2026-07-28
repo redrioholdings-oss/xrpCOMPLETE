@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "149"
+APP_VERSION = "150"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -2698,7 +2698,10 @@ def fetch_top10():
                 continue
             sym = (c.get("symbol") or "").upper()
             entry = {
-                "rank": c.get("market_cap_rank") or (i + 1),
+                # Rank assigned after the loop from live market-cap ordering.
+                # CoinGecko's market_cap_rank field is a cached global rank that
+                # lags live prices, which produced badges like 1-9 then 16.
+                "rank": 0,
                 "name": c.get("name", sym),
                 "symbol": sym,
                 "price": price,
@@ -2718,7 +2721,9 @@ def fetch_top10():
             entry["cat_color"] = cat_color
             total_mcap += mcap
             parsed.append(entry)
-        for e in parsed:
+        parsed.sort(key=lambda e: e["mcap"], reverse=True)
+        for pos, e in enumerate(parsed, start=1):
+            e["rank"] = pos
             e["dominance"] = (e["mcap"] / total_mcap * 100) if total_mcap else 0
         if parsed:
             MARKET["top10"] = parsed
