@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "148"
+APP_VERSION = "149"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -2243,6 +2243,7 @@ MARKET = {
     "perf_1w": None, "perf_30d": None, "perf_90d": None, "perf_6m": None,
     "fx": {},
     "competitors": {},
+    "top10": [], "top10_updated": None,
     "ad_7d_delta": None, "ad_30d_delta": None,
     "corr_btc": None, "corr_eth": None,
     "ob_bids": [], "ob_asks": [], "ob_bid_total": None, "ob_ask_total": None,
@@ -2640,6 +2641,92 @@ def fetch_competitors():
             pass
 
 
+TOP10_CATEGORIES = {
+    "BTC":  ("Store of Value",        "var(--yl)"),
+    "ETH":  ("Smart Contract Platform","var(--bl)"),
+    "XRP":  ("Cross-Border Payments", "var(--hdr)"),
+    "USDT": ("Stablecoin",            "var(--tq)"),
+    "USDC": ("Stablecoin",            "var(--tq)"),
+    "BNB":  ("Exchange Token",        "var(--or)"),
+    "SOL":  ("Smart Contract Platform","var(--bl)"),
+    "DOGE": ("Payments / Meme",       "var(--gr)"),
+    "TRX":  ("Payments Infrastructure","var(--gr)"),
+    "ADA":  ("Smart Contract Platform","var(--bl)"),
+    "STETH":("Liquid Staking",        "var(--tq)"),
+    "AVAX": ("Smart Contract Platform","var(--bl)"),
+    "SHIB": ("Payments / Meme",       "var(--gr)"),
+    "TON":  ("Smart Contract Platform","var(--bl)"),
+    "DOT":  ("Interoperability",      "var(--br)"),
+    "LINK": ("Oracle Network",        "var(--br)"),
+    "LTC":  ("Payments",              "var(--gr)"),
+    "BCH":  ("Payments",              "var(--gr)"),
+    "XLM":  ("Cross-Border Payments", "var(--hdr)"),
+    "HBAR": ("Enterprise Ledger",     "var(--br)"),
+    "SUI":  ("Smart Contract Platform","var(--bl)"),
+    "WBTC": ("Store of Value",        "var(--yl)"),
+}
+TOP10_CATEGORY_DEFAULT = ("Digital Asset", "var(--tx)")
+
+
+def fetch_top10():
+    """V149: Top 10 Cryptocurrencies by market cap \u2014 checked, listed, categorized,
+    10 data points each. One lightweight, purpose-built call for exactly a top-N
+    ranking (fixed from an earlier draft that pulled the full multi-thousand-coin
+    CoinPaprika tickers list and filtered client-side)."""
+    hdr = {"User-Agent": "XRPComplete/4"}
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/coins/markets",
+            params={
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 10,
+                "page": 1,
+                "price_change_percentage": "1h,24h,7d",
+            },
+            headers=hdr, timeout=8,
+        )
+        rows = r.json()
+        if not isinstance(rows, list) or not rows:
+            return
+        parsed = []
+        total_mcap = 0.0
+        for i, c in enumerate(rows[:10]):
+            price = float(c.get("current_price") or 0)
+            mcap = float(c.get("market_cap") or 0)
+            if not price:
+                continue
+            sym = (c.get("symbol") or "").upper()
+            entry = {
+                "rank": c.get("market_cap_rank") or (i + 1),
+                "name": c.get("name", sym),
+                "symbol": sym,
+                "price": price,
+                "mcap": mcap,
+                "vol24": float(c.get("total_volume") or 0),
+                "chg1h": float(c.get("price_change_percentage_1h_in_currency") or 0),
+                "chg24h": float(c.get("price_change_percentage_24h_in_currency")
+                                or c.get("price_change_percentage_24h") or 0),
+                "chg7d": float(c.get("price_change_percentage_7d_in_currency") or 0),
+                "supply": float(c.get("circulating_supply") or 0),
+                "max_supply": float(c.get("max_supply") or 0),
+                "ath_price": float(c.get("ath") or 0),
+                "pct_from_ath": float(c.get("ath_change_percentage") or 0),
+            }
+            cat, cat_color = TOP10_CATEGORIES.get(sym, TOP10_CATEGORY_DEFAULT)
+            entry["category"] = cat
+            entry["cat_color"] = cat_color
+            total_mcap += mcap
+            parsed.append(entry)
+        for e in parsed:
+            e["dominance"] = (e["mcap"] / total_mcap * 100) if total_mcap else 0
+        if parsed:
+            MARKET["top10"] = parsed
+            MARKET["top10_updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    except Exception:
+        pass
+
+
 def _pearson(x, y):
     n = min(len(x), len(y))
     if n < 5:
@@ -2722,6 +2809,7 @@ def _bg_refresh():
                 fetch_fx()
                 fetch_competitors()
                 fetch_correlation()
+                fetch_top10()
             if n % 2 == 0:
                 fetch_orderbook()
             if n % 60 == 0:  # check hourly whether the 3-day static directory refresh is due
@@ -4291,6 +4379,103 @@ def _fmt_usd(v):
     if v >= 1e3:
         return f"${v / 1e3:.1f}K"
     return f"${v:.2f}"
+
+def _fmt_num(v):
+    if not v:
+        return "\u2014"
+    if v >= 1e9:
+        return f"{v / 1e9:.2f}B"
+    if v >= 1e6:
+        return f"{v / 1e6:.2f}M"
+    if v >= 1e3:
+        return f"{v / 1e3:.1f}K"
+    return f"{v:.2f}"
+
+
+def _fmt_price(v):
+    if not v:
+        return "\u2014"
+    if v >= 1:
+        return f"${v:,.2f}"
+    if v >= 0.01:
+        return f"${v:.4f}"
+    return f"${v:.6f}"
+
+
+def top10_cards_html():
+    """V149: Top 10 Cryptocurrencies \u2014 dominance ribbon + per-coin cards,
+    10 data points each. 'Precision Ink meets terminal' visual treatment."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return ('<div style="padding:22px;text-align:center;color:var(--tx);font-family:var(--mn)">'
+                'Live rankings loading \u2014 checking market data now\u2026</div>')
+
+    # Dominance ribbon: one segment per coin, width = share of combined top-10 market cap
+    ribbon = "".join(
+        f'<div class="t10-rib-seg" style="width:{max(c["dominance"],1.2):.2f}%;background:{c["cat_color"]}" '
+        f'title="{c["symbol"]} \u2014 {c["dominance"]:.1f}% of top-10 cap"></div>'
+        for c in rows
+    )
+    ribbon_keys = "".join(
+        f'<div class="t10-rib-key"><span class="t10-rib-dot" style="background:{c["cat_color"]}"></span>'
+        f'{c["symbol"]} <b>{c["dominance"]:.1f}%</b></div>'
+        for c in rows
+    )
+
+    cards = []
+    for c in rows:
+        chg24 = c["chg24h"]
+        chg7 = c["chg7d"]
+        chg1 = c["chg1h"]
+        col24 = "var(--gr)" if chg24 >= 0 else "var(--rd)"
+        col7 = "var(--gr)" if chg7 >= 0 else "var(--rd)"
+        col1 = "var(--gr)" if chg1 >= 0 else "var(--rd)"
+        arrow24 = "\u25B2" if chg24 >= 0 else "\u25BC"
+        is_xrp = c["symbol"] == "XRP"
+        glow = "box-shadow:0 0 0 1px var(--hdr) inset,0 0 16px rgba(3,177,252,.25);" if is_xrp else ""
+        border = "border-color:rgba(3,177,252,.55);" if is_xrp else ""
+        supply_pct = None
+        if c["max_supply"]:
+            supply_pct = min(100, c["supply"] / c["max_supply"] * 100)
+        cards.append(f"""
+        <div class="t10-card" style="{border}{glow}">
+          <div class="t10-card-top">
+            <div class="t10-rank">#{c["rank"]}</div>
+            <div class="t10-name">
+              <div class="t10-sym">{c["symbol"]}{' <span class="t10-xrp-tag">XC FLAGSHIP</span>' if is_xrp else ''}</div>
+              <div class="t10-full">{c["name"]}</div>
+            </div>
+            <div class="t10-cat" style="color:{c["cat_color"]};border-color:{c["cat_color"]}">{c["category"]}</div>
+          </div>
+          <div class="t10-price-row">
+            <div class="t10-price">{_fmt_price(c["price"])}</div>
+            <div class="t10-chg" style="color:{col24}">{arrow24} {abs(chg24):.2f}% <span class="t10-chg-lbl">24h</span></div>
+          </div>
+          <div class="t10-grid">
+            <div class="t10-cell"><span class="t10-k">Market Cap</span><span class="t10-v">${_fmt_num(c["mcap"])}</span></div>
+            <div class="t10-cell"><span class="t10-k">24h Volume</span><span class="t10-v">${_fmt_num(c["vol24"])}</span></div>
+            <div class="t10-cell"><span class="t10-k">1h Change</span><span class="t10-v" style="color:{col1}">{'+' if chg1>=0 else ''}{chg1:.2f}%</span></div>
+            <div class="t10-cell"><span class="t10-k">7d Change</span><span class="t10-v" style="color:{col7}">{'+' if chg7>=0 else ''}{chg7:.2f}%</span></div>
+            <div class="t10-cell"><span class="t10-k">Circulating Supply</span><span class="t10-v">{_fmt_num(c["supply"])} {c["symbol"]}</span></div>
+            <div class="t10-cell"><span class="t10-k">Max Supply</span><span class="t10-v">{_fmt_num(c["max_supply"]) if c["max_supply"] else "Uncapped"}</span></div>
+            <div class="t10-cell"><span class="t10-k">All-Time High</span><span class="t10-v">{_fmt_price(c["ath_price"])}</span></div>
+            <div class="t10-cell"><span class="t10-k">From ATH</span><span class="t10-v" style="color:var(--rd)">{c["pct_from_ath"]:.1f}%</span></div>
+            <div class="t10-cell"><span class="t10-k">Top-10 Dominance</span><span class="t10-v">{c["dominance"]:.2f}%</span></div>
+            <div class="t10-cell"><span class="t10-k">Category</span><span class="t10-v" style="color:{c["cat_color"]}">{c["category"]}</span></div>
+          </div>
+          {f'<div class="t10-supply-track"><div class="t10-supply-fill" style="width:{supply_pct:.1f}%;background:{c["cat_color"]}"></div></div><div class="t10-supply-lbl">{supply_pct:.1f}% of max supply mined</div>' if supply_pct is not None else ''}
+        </div>""")
+
+    return f"""
+      <div class="t10-rib-wrap">
+        <div class="t10-rib-lbl">Combined Top-10 Market-Cap Share</div>
+        <div class="t10-rib">{ribbon}</div>
+        <div class="t10-rib-keys">{ribbon_keys}</div>
+      </div>
+      <div class="t10-grid-outer">{''.join(cards)}</div>
+      <div class="t10-foot">Ranked live by market capitalization \u2014 {len(rows)} assets checked. Categories are XRP Complete editorial classifications. Updated {MARKET.get("top10_updated") or "\u2014"}. Not financial advice.</div>
+"""
+
 
 def signal_stats():
     pool = NEWS.get("pool", [])
@@ -6441,6 +6626,7 @@ def render_page(page="main"):
 
     # V109: 30-Day Historical Price Table, News Mention Volume, DCA Calculator data
     hist30_html = historical_30d_html()
+    top10_html = top10_cards_html()
     nmv_cat_html, nmv_day_label, nmv_total, nmv_contributors, nmv_day_str = news_mention_volume_html()
     dca_history_json = json.dumps([
         {"t": r["t"], "c": round(r["c"], 6)} for r in (MARKET.get("hist_full") or [])
@@ -7480,6 +7666,46 @@ def render_page(page="main"):
   .nmv-bar-track{{ flex:1; height:8px; background:var(--s2); border-radius:4px; overflow:hidden; }}
   .nmv-bar-fill{{ height:100%; background:var(--yl); }}
   .nmv-n{{ font-size:13px; color:var(--br); font-family:var(--mn); width:30px; text-align:right; flex-shrink:0; }}
+
+  /* Top 10 Cryptocurrencies (V149) */
+  .t10-rib-wrap{{ margin:4px 0 18px; }}
+  .t10-rib-lbl{{ font-size:12px; font-family:var(--mn); letter-spacing:1.5px; text-transform:uppercase; color:var(--tx); margin-bottom:6px; }}
+  .t10-rib{{ display:flex; width:100%; height:20px; border-radius:10px; overflow:hidden; border:1px solid var(--b); background:var(--s2); }}
+  .t10-rib-seg{{ height:100%; transition:opacity .2s; border-right:1px solid rgba(0,0,0,.35); }}
+  .t10-rib-seg:hover{{ opacity:.72; }}
+  .t10-rib-seg:last-child{{ border-right:none; }}
+  .t10-rib-keys{{ display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:8px; font-family:var(--mn); font-size:12px; color:var(--tx); }}
+  .t10-rib-key{{ display:flex; align-items:center; gap:5px; white-space:nowrap; }}
+  .t10-rib-key b{{ color:var(--br); }}
+  .t10-rib-dot{{ width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; }}
+  .t10-grid-outer{{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }}
+  .t10-card{{ background:linear-gradient(160deg,var(--s1) 0%,#0d1220 100%); border:1px solid var(--b);
+    border-radius:12px; padding:14px 15px; position:relative; overflow:hidden; transition:transform .15s,border-color .15s; }}
+  .t10-card:hover{{ transform:translateY(-2px); border-color:rgba(117,188,255,.5); }}
+  .t10-card-top{{ display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }}
+  .t10-rank{{ font-family:var(--mn); font-weight:900; font-size:15px; color:#000; background:var(--br);
+    border-radius:7px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }}
+  .t10-name{{ flex:1; min-width:0; }}
+  .t10-sym{{ font-family:var(--mn); font-weight:900; font-size:16px; color:var(--br); letter-spacing:.5px; }}
+  .t10-xrp-tag{{ font-size:9px; font-weight:800; letter-spacing:1px; color:var(--hdr); border:1px solid var(--hdr);
+    border-radius:4px; padding:1px 5px; margin-left:4px; vertical-align:middle; }}
+  .t10-full{{ font-size:12px; color:var(--tx); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .t10-cat{{ font-size:10px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; border:1px solid;
+    border-radius:20px; padding:3px 9px; white-space:nowrap; flex-shrink:0; }}
+  .t10-price-row{{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;
+    padding-bottom:10px; border-bottom:1px solid var(--b); }}
+  .t10-price{{ font-family:var(--mn); font-weight:900; font-size:20px; color:#fff; }}
+  .t10-chg{{ font-family:var(--mn); font-weight:800; font-size:14px; white-space:nowrap; }}
+  .t10-chg-lbl{{ font-size:10px; color:var(--tx); font-weight:600; }}
+  .t10-grid{{ display:grid; grid-template-columns:1fr 1fr; gap:7px 12px; }}
+  .t10-cell{{ display:flex; flex-direction:column; gap:1px; }}
+  .t10-k{{ font-size:10.5px; color:var(--tx); text-transform:uppercase; letter-spacing:.5px; }}
+  .t10-v{{ font-family:var(--mn); font-size:13px; font-weight:700; color:var(--br); }}
+  .t10-supply-track{{ height:5px; background:var(--s2); border-radius:3px; overflow:hidden; margin-top:12px; }}
+  .t10-supply-fill{{ height:100%; }}
+  .t10-supply-lbl{{ font-size:10.5px; color:var(--tx); margin-top:4px; font-family:var(--mn); }}
+  .t10-foot{{ font-size:11px; color:var(--tx); font-style:italic; margin-top:14px; }}
+  @media(max-width:900px){{ .t10-grid-outer{{ grid-template-columns:1fr; }} }}
 
   /* ============================================================
      RESPONSIVE SAFETY NET (V107) \u2014 catch-all rules for phones and
@@ -9106,7 +9332,16 @@ def render_page(page="main"):
     </div>
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew']}
+    _B['top10'] = f"""    <!-- SECTION 32: TOP 10 CRYPTOCURRENCIES (V149) -->
+    <div class="acct" style="border-color:rgba(255,153,0,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#127942;</span> Top 10 Cryptocurrencies</div>
+      <div class="trk-tag" style="color:var(--tx)">Checked and ranked live by market capitalization, categorized by role, with ten data points per asset \u2014 price, market cap, volume, 1h/24h/7d change, circulating and max supply, all-time high, distance from ATH, and top-10 dominance share.</div>
+      {top10_html}
+    </div>
+
+"""
+
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -9738,6 +9973,11 @@ except Exception:
 
 try:
     fetch_competitors()
+except Exception:
+    pass
+
+try:
+    fetch_top10()
 except Exception:
     pass
 
