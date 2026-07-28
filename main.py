@@ -155,7 +155,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "147"
+APP_VERSION = "148"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -3124,7 +3124,13 @@ NEWS = {"current": [], "weekly": [], "pool": [], "feeds_active": 0, "feeds_total
 REGIONS = ["Japan", "Korea", "UAE", "Europe", "India", "LatAm", "Africa", "SEA"]
 REGION_FLAGS = {"Japan": "\U0001F1EF\U0001F1F5", "Korea": "\U0001F1F0\U0001F1F7", "UAE": "\U0001F1E6\U0001F1EA",
                 "Europe": "\U0001F1EA\U0001F1FA", "India": "\U0001F1EE\U0001F1F3", "LatAm": "\U0001F30E",
-                "Africa": "\U0001F30D", "SEA": "\U0001F30F"}
+                "Africa": "\U0001F30D", "SEA": "\U0001F30F",
+                # V148: US isn't in REGIONS/REGION_DISPLAY (it has its own dedicated
+                # "US Intelligence" panel elsewhere), but stories can still carry
+                # region="US" via keyword detection -- and this dict had no fallback,
+                # so REGION_FLAGS.get("US","") silently returned nothing wherever a
+                # region flag was rendered (e.g. the Brief's Regional section).
+                "US": "\U0001F1FA\U0001F1F8"}
 REGION_KEYWORDS = {
     "Japan":  ["japan", "japanese", "sbi", "bitflyer", "coincheck", "jpn", "yen"],
     "Korea":  ["korea", "korean", "upbit", "bithumb", "coinone", "korbit", "krw"],
