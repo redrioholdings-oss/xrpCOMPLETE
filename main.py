@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "157"
+APP_VERSION = "158"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -13259,10 +13259,16 @@ def render_page(page="main"):
   /* ---- V121 six-page navigation ---- */
   /* V157 hero header */
   .hdr2{{ margin:0 0 0; }}
-  .hdr2-top{{ display:flex; align-items:center; gap:14px; padding:14px 0 10px; }}
-  .h2-name{{ font-size:27px; font-weight:800; letter-spacing:1px; line-height:1.05; }}
+  /* V158: title row shares the line with the breaking bar; bar clips at the
+     title's edge (overflow) and never overlaps it. Title at half size. */
+  .hdr2-toprow{{ display:flex; align-items:center; gap:18px; padding:8px 0 6px; }}
+  .hdr2-top{{ display:flex; align-items:center; gap:8px; flex-shrink:0; }}
+  .hdr2-toprow #breaking{{ flex:1; min-width:0; background:transparent; padding:0; }}
+  .hdr2-toprow .bkinner{{ max-width:none; padding:0; }}
+  .hdr2-toprow .bkrow{{ border-bottom:none; padding-bottom:0; }}
+  .h2-name{{ font-size:14px; font-weight:800; letter-spacing:0.6px; line-height:1.05; }}
   .h2-x{{ color:#fff; }} .h2-c{{ color:#008CFF; }}
-  .h2-net{{ font-size:11px; color:var(--tx); letter-spacing:3.5px; margin-top:3px; }}
+  .h2-net{{ font-size:8px; color:var(--tx); letter-spacing:2px; margin-top:2px; }}
   .ustrip{{ display:flex; align-items:center; justify-content:space-between; gap:14px;
            flex-wrap:wrap; padding:8px 12px; font-size:12.5px; font-weight:700;
            letter-spacing:1.2px; font-family:var(--mn);
@@ -13308,7 +13314,8 @@ def render_page(page="main"):
             border:1px solid rgba(72,255,130,.5); background:rgba(72,255,130,.08);
             padding:4px 12px; border-radius:6px; margin-bottom:14px; }}
   .hc-live-dot{{ width:7px; height:7px; border-radius:50%; background:var(--gr);
-                box-shadow:0 0 6px var(--gr); }}
+                box-shadow:0 0 6px var(--gr); animation:hcblink 1.5s ease-in-out infinite; }}
+  @keyframes hcblink{{ 0%,100%{{ opacity:1; }} 50%{{ opacity:.15; }} }}
   .hc-row{{ display:flex; justify-content:space-between; align-items:flex-start;
            gap:10px; margin:7px 0; }}
   .hc-k{{ font-size:11.5px; letter-spacing:1.5px; color:var(--tx); font-weight:700;
@@ -13339,7 +13346,9 @@ def render_page(page="main"):
     .feat{{ flex:1 1 38%; padding:0 6px; }} .feat:nth-child(3){{ border-left:none; }}
     .hero-card{{ position:relative; right:auto; top:auto; transform:none;
                 width:auto; margin:0 4px 18px; }}
-    .ustrip{{ justify-content:center; text-align:center; }} }}
+    .ustrip{{ justify-content:center; text-align:center; }}
+    .hdr2-toprow{{ flex-wrap:wrap; gap:8px 18px; }}
+    .hdr2-toprow #breaking{{ flex:1 1 100%; }} }}
   .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
          border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
          padding:10px 0; }}
@@ -13405,26 +13414,27 @@ def render_page(page="main"):
 
     _chrome = f"""<body id="top">
 
-  <!-- BREAKING NEWS BAR -->
-  <div id="breaking">
-    <div class="bkinner">
-      <div class="bkrow">
-        <span class="bklbl"><span class="bk-bolt">\u26A1</span>BREAKING NEWS</span>
-        <div class="bkscroll">
-          <div class="bktext" id="bktext">{bktext}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="w">
-    <!-- HEADER (V157 hero) -->
+    <!-- HEADER (V157 hero / V158 title row) -->
     <div class="hdr2">
-      <div class="hdr2-top">
-        <div class="icon"><img src="/logo.jpg" alt="XRP Complete" width="47" height="100"></div>
-        <div>
-          <div class="h2-name"><span class="h2-x">XRP </span><span class="h2-c">COMPLETE</span></div>
-          <div class="h2-net">INTELLIGENCE NETWORK</div>
+      <div class="hdr2-toprow">
+        <div class="hdr2-top">
+          <div class="icon"><img src="/logo.jpg" alt="XRP Complete" width="24" height="50"></div>
+          <div>
+            <div class="h2-name"><span class="h2-x">XRP </span><span class="h2-c">COMPLETE</span></div>
+            <div class="h2-net">INTELLIGENCE NETWORK</div>
+          </div>
+        </div>
+        <!-- BREAKING NEWS BAR (V158: runs into the title row, clipped at its edge) -->
+        <div id="breaking">
+          <div class="bkinner">
+            <div class="bkrow">
+              <span class="bklbl"><span class="bk-bolt">\u26A1</span>BREAKING NEWS</span>
+              <div class="bkscroll">
+                <div class="bktext" id="bktext">{bktext}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="ustrip">
