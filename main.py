@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "161"
+APP_VERSION = "163"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -15605,25 +15605,26 @@ def render_page(page="main"):
            box-shadow:0 0 6px var(--gr); display:inline-block; }}
   .us-c{{ color:#CC5F00; }}
   .us-r{{ color:#E0447C; }}
-  .hero{{ position:relative; overflow:hidden; min-height:572px;
+  .hero{{ position:relative; overflow:hidden; min-height:440px;
          display:flex; align-items:center; background:#02040a; }}
-  .hero-art{{ position:absolute; top:0; right:0; height:100%; width:72%;
+  /* V162: astronaut artwork itself 30% larger, centered overflow cropped */
+  .hero-art{{ position:absolute; top:-15%; right:0; height:130%; width:72%;
              object-fit:cover; object-position:center; z-index:0; }}
   .hero-fade{{ position:absolute; inset:0; z-index:1;
       background:linear-gradient(90deg,#02040a 0%,#02040a 30%,rgba(2,4,10,.55) 52%,rgba(2,4,10,0) 78%); }}
-  .hero-l{{ position:relative; z-index:2; max-width:830px; padding:50px 0 52px; }}
-  .hero-h{{ margin:0 0 20px; color:#fff; font-size:60px; line-height:1.12;
+  .hero-l{{ position:relative; z-index:2; max-width:640px; padding:38px 0 40px; }}
+  .hero-h{{ margin:0 0 16px; color:#fff; font-size:46px; line-height:1.12;
            font-weight:800; letter-spacing:0.5px; }}
   .hero-new{{ color:#008CFF; font-style:italic; }}
-  .hero-sub{{ margin:0 0 34px; color:var(--tx); font-size:22px; line-height:1.5;
-             max-width:675px; }}
-  .feats{{ display:flex; margin:0 0 36px; }}
+  .hero-sub{{ margin:0 0 26px; color:var(--tx); font-size:17px; line-height:1.5;
+             max-width:520px; }}
+  .feats{{ display:flex; margin:0 0 28px; }}
   .feat{{ flex:1; display:flex; flex-direction:column; align-items:center; gap:9px;
          padding:0 12px; text-align:center; border-left:1px solid rgba(0,140,255,.25); }}
   .feat:first-child{{ border-left:none; padding-left:0; }}
-  .feat svg{{ width:42px; height:42px; stroke:#008CFF; fill:none; stroke-width:1.6;
+  .feat svg{{ width:32px; height:32px; stroke:#008CFF; fill:none; stroke-width:1.6;
              stroke-linecap:round; stroke-linejoin:round; }}
-  .feat span{{ font-size:14px; font-weight:700; letter-spacing:1.5px; color:#dfe7f2;
+  .feat span{{ font-size:11px; font-weight:700; letter-spacing:1.3px; color:#dfe7f2;
               line-height:1.45; }}
   .hero-cta{{ display:inline-block; background:#008CFF; color:#fff; font-weight:800;
              font-size:14px; letter-spacing:1.5px; padding:13px 24px; border-radius:7px;
