@@ -5,6 +5,26 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V151 changes:
+  1. New COMPETITION page (/competition) added to the site navigation with
+     seven sections, all powered by data the app already fetches (the V149
+     top-10 CoinGecko call and the existing Google News RSS pipeline):
+       - Market Share: horizontal bars, one per top-10 coin, color-coded to
+         each coin's traditional brand color (BTC orange, XRP #008CFF, ...).
+       - Competitive News: one leading story per coin, refreshed on a
+         12-hour cycle (00:00 / 12:00 UTC), source + link shown.
+       - Available Tokens: two rows of five donut charts; the coin's brand
+         color = share of supply already in circulation (purchased), gray =
+         remaining available supply; values frozen once daily at 08:00 UTC.
+       - 24-Hour Performance Race: sorted 24h change bars.
+       - Distance From All-Time High: recovery-level bars per coin.
+       - 24h Volume Share: share of combined top-10 trading volume.
+       - The Flippening Meter: XRP vs each of the other nine by market cap.
+     Brand-color note: TRX/AVAX/DOT brand colors are red/pink; they appear
+     only as coin identity colors in these sections (data, not design) and
+     are used nowhere else. ADA/LTC/XLM brand colors brightened slightly
+     for legibility on the black background.
+
 V127 changes:
   1. Final dimensions locked: 250px wide x 70px tall (height:70px,
      width:250px). Supersedes V126's 170x70.
@@ -155,7 +175,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "150"
+APP_VERSION = "151"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -2667,6 +2687,108 @@ TOP10_CATEGORIES = {
 }
 TOP10_CATEGORY_DEFAULT = ("Digital Asset", "var(--tx)")
 
+# ── V151: COMPETITION PAGE ───────────────────────────────────────────
+# Traditional brand colors per coin (Rich: BTC orange, XRP light blue
+# #008CFF, etc.). ADA/LTC/XLM brightened slightly so they read on the
+# black background; TRX/AVAX/DOT keep their red/pink brand colors as coin
+# identity only (data, not design) — used nowhere else on the site.
+COIN_COLORS = {
+    "BTC": "#F7931A", "ETH": "#627EEA", "USDT": "#26A17B", "XRP": "#008CFF",
+    "BNB": "#F3BA2F", "SOL": "#9945FF", "USDC": "#2775CA", "DOGE": "#C2A633",
+    "ADA": "#3468DC", "TRX": "#EB0029", "STETH": "#00A3FF", "LINK": "#375BD2",
+    "AVAX": "#E84142", "SHIB": "#FFA409", "TON": "#0098EA", "DOT": "#E6007A",
+    "LTC": "#5C9DD5", "BCH": "#8DC351", "XLM": "#C8D2E0", "HBAR": "#9C8CFF",
+    "SUI": "#4DA2FF", "WBTC": "#F09242",
+}
+COIN_COLOR_DEFAULT = "#8099b3"
+
+def _coin_color(sym):
+    return COIN_COLORS.get(sym, COIN_COLOR_DEFAULT)
+
+_CMP_LOADING = ('<div style="padding:22px;text-align:center;color:var(--tx);font-family:var(--mn)">'
+                'Live competitive data loading \u2014 checking market feeds now\u2026</div>')
+
+# Competitive News — one leading story per top-10 coin, 12-hour cycle.
+# Slot flips at 00:00 and 12:00 UTC; between flips the cached stories are
+# served with zero network cost. Each refresh is ten small Google News RSS
+# queries through the existing _parse_feed/_parse_date pipeline. Google
+# News relevance ranking is the closest available public proxy for
+# "most read" — actual read counts are not published by any free source.
+COMPNEWS = {"slot": None, "rows": [], "updated": None}
+
+def _compnews_slot(now):
+    return f"{now.date().isoformat()}-{'AM' if now.hour < 12 else 'PM'}"
+
+def fetch_competition_news():
+    """V151: refresh the per-coin competitive stories if the 12h slot changed."""
+    now = datetime.now(timezone.utc)
+    slot = _compnews_slot(now)
+    if COMPNEWS["slot"] == slot and COMPNEWS["rows"]:
+        return
+    coins = MARKET.get("top10") or []
+    if not coins:
+        return
+    hdr = {"User-Agent": "XRPComplete/4"}
+    rows = []
+    for c in coins:
+        name, sym = c["name"], c["symbol"]
+        story = None
+        # First pass restricted to the last 12 hours; if a coin has no
+        # story in that window, fall back to its newest story overall
+        # (the card's timestamp makes the age visible either way).
+        for q in (f"{name} {sym} crypto when:12h", f"{name} {sym} crypto"):
+            try:
+                r = requests.get("https://news.google.com/rss/search",
+                                 params={"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"},
+                                 headers=hdr, timeout=8)
+                entries = _parse_feed(r.content)
+            except Exception:
+                entries = []
+            if entries and entries[0]["title"]:
+                e = entries[0]
+                dt = _parse_date(e["date_str"]) or now
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                title = e["title"]
+                source = ""
+                if " - " in title:
+                    title, source = title.rsplit(" - ", 1)
+                story = {"symbol": sym, "name": name, "title": title[:170].strip(),
+                         "source": source.strip() or "Google News",
+                         "link": e["link"] or "#", "dt": dt}
+                break
+        if story:
+            rows.append(story)
+        else:
+            rows.append({"symbol": sym, "name": name, "title": "",
+                         "source": "", "link": "#", "dt": now})
+    if rows:
+        COMPNEWS["rows"] = rows
+        COMPNEWS["slot"] = slot
+        COMPNEWS["updated"] = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+# Available Tokens — one frozen supply reading per day, taken at (or on the
+# first render after) 08:00 UTC and held constant until the next 08:00 UTC.
+TOKEN_SNAP = {"day": None, "rows": [], "captured": None}
+
+def _token_snap_check():
+    """V151: capture the daily 08:00-UTC supply snapshot if it is due."""
+    now = datetime.now(timezone.utc)
+    day = (now - timedelta(hours=8)).date().isoformat()  # flips exactly at 08:00 UTC
+    if TOKEN_SNAP["day"] == day and TOKEN_SNAP["rows"]:
+        return
+    coins = MARKET.get("top10") or []
+    if not coins:
+        return
+    rows = []
+    for c in coins:
+        pct = min(100.0, c["supply"] / c["max_supply"] * 100) if c["max_supply"] else None
+        rows.append({"symbol": c["symbol"], "name": c["name"], "pct": pct,
+                     "supply": c["supply"], "max_supply": c["max_supply"]})
+    TOKEN_SNAP["rows"] = rows
+    TOKEN_SNAP["day"] = day
+    TOKEN_SNAP["captured"] = now.strftime("%Y-%m-%d %H:%M UTC")
+
 
 def fetch_top10():
     """V149: Top 10 Cryptocurrencies by market cap \u2014 checked, listed, categorized,
@@ -2833,6 +2955,7 @@ def _bg_news():
             fetch_news()
             fetch_exec_tracker()
             fetch_clarity_tracker()
+            fetch_competition_news()  # V151: no-op unless the 12h slot changed
             if n % 2 == 0:
                 fetch_github_dev()
             if n % 4 == 0:
@@ -4480,6 +4603,180 @@ def top10_cards_html():
       <div class="t10-grid-outer">{''.join(cards)}</div>
       <div class="t10-foot">Ranked live by market capitalization \u2014 {len(rows)} assets checked. Categories are XRP Complete editorial classifications. Updated {MARKET.get("top10_updated") or "\u2014"}. Not financial advice.</div>
 """
+
+
+
+# ── V151: COMPETITION PAGE — SECTION BUILDERS ────────────────────────
+def competition_share_html():
+    """Market Share: one horizontal bar per top-10 coin, brand-color coded."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    out = []
+    for c in rows:
+        col = _coin_color(c["symbol"])
+        pct = c["dominance"]
+        out.append(
+            f'<div class="cmp-bar-row">'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{max(pct, 1.0):.2f}%;background:{col}"></div></div>'
+            f'<span class="cmp-bar-val">{pct:.2f}%</span></div>'
+        )
+    upd = MARKET.get("top10_updated") or "\u2014"
+    return ('<div class="cmp-bars">' + "".join(out) + "</div>"
+            f'<div class="cmp-foot">Share of combined top-10 market capitalization, live-ranked, each bar in the coin\u2019s traditional brand color. Updated {upd}.</div>')
+
+
+def competition_news_html():
+    """Competitive News: one leading story per coin, 12-hour refresh cycle."""
+    rows = COMPNEWS.get("rows") or []
+    if not rows:
+        return _CMP_LOADING
+    cards = []
+    for s in rows:
+        col = _coin_color(s["symbol"])
+        if s["title"]:
+            body = (f'<a class="cmp-news-hl" href="{html.escape(s["link"], quote=True)}" '
+                    f'target="_blank" rel="noopener">{html.escape(s["title"])}</a>'
+                    f'<div class="cmp-news-meta">{html.escape(s["source"])} \u2022 {_time_ago(s["dt"])}</div>')
+        else:
+            body = '<div class="cmp-news-meta">No fresh story surfaced this cycle \u2014 rechecks at the next 12-hour refresh.</div>'
+        cards.append(
+            f'<div class="cmp-news-card" style="border-left-color:{col}">'
+            f'<div class="cmp-news-top"><span class="cmp-news-sym" style="color:{col}">{s["symbol"]}</span>'
+            f'<span class="cmp-news-name">{html.escape(s["name"])}</span></div>{body}</div>'
+        )
+    upd = COMPNEWS.get("updated") or "\u2014"
+    return ('<div class="cmp-news-grid">' + "".join(cards) + "</div>"
+            '<div class="cmp-foot">One leading story per coin, ranked by Google News prominence \u2014 the closest public measure of readership. '
+            f'Refreshes every 12 hours at 00:00 and 12:00 UTC. Cycle generated {upd}.</div>')
+
+
+def competition_tokens_html():
+    """Available Tokens: two rows of five donuts; brand color = circulating
+    (purchased) share, gray = remaining available supply. Frozen daily 08:00 UTC."""
+    _token_snap_check()
+    rows = TOKEN_SNAP.get("rows") or []
+    if not rows:
+        return _CMP_LOADING
+    cells = []
+    for c in rows:
+        col = _coin_color(c["symbol"])
+        if c["pct"] is not None:
+            pct = c["pct"]
+            grad = f"conic-gradient({col} 0 {pct:.1f}%, #39424f {pct:.1f}% 100%)"
+            center = f"{pct:.0f}%"
+            sub = f"{pct:.1f}% purchased \u2022 {100 - pct:.1f}% available"
+        else:
+            grad = f"conic-gradient({col} 0 100%)"
+            center = "\u221E"
+            sub = "Uncapped \u2014 no max supply"
+        cells.append(
+            f'<div class="cmp-pie-cell">'
+            f'<div class="cmp-pie" style="background:{grad}"><div class="cmp-pie-in">{center}</div></div>'
+            f'<div class="cmp-pie-sym" style="color:{col}">{c["symbol"]}</div>'
+            f'<div class="cmp-pie-sub">{sub}</div></div>'
+        )
+    cap = TOKEN_SNAP.get("captured") or "\u2014"
+    return ('<div class="cmp-pies">' + "".join(cells) + "</div>"
+            '<div class="cmp-foot">Colored slice = share of supply already in circulation (purchased); gray = remaining available supply against the coin\u2019s maximum. '
+            f'Coins with no supply cap show a full ring. Values freeze once daily at 08:00 UTC \u2014 this reading captured {cap}.</div>')
+
+
+def competition_race_html():
+    """24-Hour Performance Race: sorted 24h change bars."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    ordered = sorted(rows, key=lambda c: c["chg24h"], reverse=True)
+    peak = max((abs(c["chg24h"]) for c in ordered), default=0) or 1
+    out = []
+    for c in ordered:
+        col = _coin_color(c["symbol"])
+        chg = c["chg24h"]
+        vcol = "var(--gr)" if chg >= 0 else "var(--rd)"
+        width = max(abs(chg) / peak * 100, 2)
+        out.append(
+            f'<div class="cmp-bar-row">'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{width:.1f}%;background:{vcol}"></div></div>'
+            f'<span class="cmp-bar-val" style="color:{vcol}">{"+" if chg >= 0 else ""}{chg:.2f}%</span></div>'
+        )
+    return ('<div class="cmp-bars">' + "".join(out) + "</div>"
+            '<div class="cmp-foot">24-hour price change, fastest first. Bar length is scaled to the day\u2019s biggest mover; green and red follow the site-wide gain/loss convention.</div>')
+
+
+def competition_ath_html():
+    """Distance From All-Time High: recovery-level bars per coin."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    ordered = sorted(rows, key=lambda c: c["pct_from_ath"], reverse=True)
+    out = []
+    for c in ordered:
+        col = _coin_color(c["symbol"])
+        level = max(0.0, min(100.0, 100.0 + c["pct_from_ath"]))  # % of ATH price held today
+        out.append(
+            f'<div class="cmp-bar-row">'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{max(level, 1.5):.1f}%;background:{col}"></div></div>'
+            f'<span class="cmp-bar-val">{c["pct_from_ath"]:.1f}%</span></div>'
+        )
+    return ('<div class="cmp-bars">' + "".join(out) + "</div>"
+            '<div class="cmp-foot">How much of its all-time-high price each coin holds today \u2014 a full bar means the coin is trading at its record. The figure on the right is the distance still below that record.</div>')
+
+
+def competition_vol_html():
+    """24h Volume Share: share of combined top-10 trading volume."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    total = sum(c["vol24"] for c in rows) or 1
+    ordered = sorted(rows, key=lambda c: c["vol24"], reverse=True)
+    out = []
+    for c in ordered:
+        col = _coin_color(c["symbol"])
+        share = c["vol24"] / total * 100
+        out.append(
+            f'<div class="cmp-bar-row">'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{max(share, 1.0):.1f}%;background:{col}"></div></div>'
+            f'<span class="cmp-bar-val">{share:.1f}% \u2022 ${_fmt_num(c["vol24"])}</span></div>'
+        )
+    return ('<div class="cmp-bars cmp-bars-wide">' + "".join(out) + "</div>"
+            '<div class="cmp-foot">Each coin\u2019s share of the combined top-10 24-hour trading volume \u2014 where the day\u2019s money is actually moving.</div>')
+
+
+def competition_flip_html():
+    """The Flippening Meter: XRP vs each of the other nine by market cap."""
+    rows = MARKET.get("top10") or []
+    xrp = next((c for c in rows if c["symbol"] == "XRP"), None)
+    if not rows or not xrp or not xrp["mcap"]:
+        return _CMP_LOADING
+    cards = [
+        '<div class="cmp-flip-card" style="border-color:rgba(0,140,255,.55)">'
+        '<div class="cmp-flip-h"><span class="cmp-flip-sym" style="color:#008CFF">XRP \u2014 BENCHMARK</span>'
+        f'<span class="cmp-flip-rank">#{xrp["rank"]}</span></div>'
+        f'<div class="cmp-flip-v">Market cap ${_fmt_num(xrp["mcap"])}. Every card below is measured against this line.</div></div>'
+    ]
+    for c in rows:
+        if c["symbol"] == "XRP":
+            continue
+        col = _coin_color(c["symbol"])
+        if c["mcap"] > xrp["mcap"]:
+            need = (c["mcap"] / xrp["mcap"] - 1) * 100
+            verdict = f'XRP needs <b>+{need:,.0f}%</b> market-cap growth to flip {c["symbol"]} (${_fmt_num(c["mcap"])}).'
+        else:
+            lead = xrp["mcap"] / c["mcap"] if c["mcap"] else 0
+            verdict = f'XRP leads {c["symbol"]} by <b>{lead:.2f}\u00D7</b> (${_fmt_num(c["mcap"])} vs ${_fmt_num(xrp["mcap"])}).'
+        cards.append(
+            f'<div class="cmp-flip-card"><div class="cmp-flip-h">'
+            f'<span class="cmp-flip-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<span class="cmp-flip-rank">#{c["rank"]}</span></div>'
+            f'<div class="cmp-flip-v">{verdict}</div></div>'
+        )
+    return ('<div class="cmp-flip-grid">' + "".join(cards) + "</div>"
+            '<div class="cmp-foot">Market-cap distance between XRP and every other top-10 asset \u2014 the growth required to flip the coins above, and the multiple XRP holds over the coins below.</div>')
 
 
 def signal_stats():
@@ -7777,6 +8074,38 @@ def render_page(page="main"):
   .rg-flag{{ border:1px solid var(--or); border-radius:8px; padding:11px 14px; margin-top:12px;
              font-size:12px; color:var(--br); line-height:1.6; background:rgba(204,95,0,.07); }}
   @media(max-width:480px){{ .rg-c{{ flex-direction:column; gap:4px; }} .rg-tbl{{ font-size:12px; }} }}
+  /* Competition page (V151) */
+  .cmp-bars{{ display:flex; flex-direction:column; gap:7px; }}
+  .cmp-bar-row{{ display:flex; align-items:center; gap:10px; }}
+  .cmp-bar-sym{{ font-family:var(--mn); font-size:13px; font-weight:800; width:58px; flex-shrink:0; letter-spacing:1px; }}
+  .cmp-bar-track{{ flex:1; height:14px; background:var(--s2); border:1px solid var(--b); border-radius:7px; overflow:hidden; }}
+  .cmp-bar-fill{{ height:100%; border-radius:7px 0 0 7px; }}
+  .cmp-bar-val{{ font-family:var(--mn); font-size:12.5px; color:var(--br); width:70px; text-align:right; flex-shrink:0; white-space:nowrap; }}
+  .cmp-bars-wide .cmp-bar-val{{ width:130px; }}
+  .cmp-foot{{ font-size:12px; color:var(--tx); margin-top:10px; line-height:1.55; }}
+  .cmp-news-grid{{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }}
+  .cmp-news-card{{ background:var(--s1); border:1px solid var(--b); border-left-width:4px; border-radius:8px; padding:10px 13px; }}
+  .cmp-news-top{{ display:flex; align-items:center; gap:8px; margin-bottom:5px; }}
+  .cmp-news-sym{{ font-family:var(--mn); font-size:12px; font-weight:800; letter-spacing:1px; }}
+  .cmp-news-name{{ font-size:11.5px; color:var(--tx); }}
+  .cmp-news-hl{{ font-size:13px; color:var(--br); text-decoration:none; line-height:1.45; display:block; }}
+  .cmp-news-hl:hover{{ color:var(--hdr); text-decoration:underline; }}
+  .cmp-news-meta{{ font-family:var(--mn); font-size:11px; color:var(--tx); margin-top:5px; }}
+  .cmp-pies{{ display:grid; grid-template-columns:repeat(5,1fr); gap:16px 10px; }}
+  .cmp-pie-cell{{ display:flex; flex-direction:column; align-items:center; gap:6px; }}
+  .cmp-pie{{ width:92px; height:92px; border-radius:50%; position:relative; border:1px solid var(--b); }}
+  .cmp-pie-in{{ position:absolute; inset:26px; background:var(--bg); border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--mn); font-size:11.5px; font-weight:800; color:var(--br); }}
+  .cmp-pie-sym{{ font-family:var(--mn); font-size:12.5px; font-weight:800; letter-spacing:1px; }}
+  .cmp-pie-sub{{ font-size:10.5px; color:var(--tx); text-align:center; line-height:1.35; max-width:130px; }}
+  .cmp-flip-grid{{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }}
+  .cmp-flip-card{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:11px 13px; }}
+  .cmp-flip-h{{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }}
+  .cmp-flip-sym{{ font-family:var(--mn); font-size:13px; font-weight:800; letter-spacing:1px; }}
+  .cmp-flip-rank{{ font-family:var(--mn); font-size:11px; color:var(--tx); }}
+  .cmp-flip-v{{ font-size:12.5px; color:var(--br); line-height:1.55; }}
+  .cmp-flip-v b{{ color:var(--hdr); }}
+  @media(max-width:900px){{ .cmp-pies{{ grid-template-columns:repeat(3,1fr); }} .cmp-news-grid{{ grid-template-columns:1fr; }} .cmp-flip-grid{{ grid-template-columns:1fr 1fr; }} }}
+  @media(max-width:520px){{ .cmp-pies{{ grid-template-columns:repeat(2,1fr); }} .cmp-flip-grid{{ grid-template-columns:1fr; }} }}
   /* ---- V121 six-page navigation ---- */
   .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
          border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
@@ -7797,7 +8126,8 @@ def render_page(page="main"):
 
     _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
               ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
-              ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"))
+              ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"),
+              ("competition","/competition","COMPETITION"))
     _nav = ('<nav class="xnav"><div class="xnav-in">' + ''.join(
         f'<a href="{h}" class="{"on" if k == page else ""}">{t}</a>'
         for k, h, t in _pages) + '</div></nav>')
@@ -9346,7 +9676,70 @@ def render_page(page="main"):
 
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew']}
+    _B['cmpshare'] = f"""    <!-- SECTION 35: COMPETITION - MARKET SHARE (V151) -->
+    <div class="acct" style="border-color:rgba(3,177,252,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#128202;</span> Market Share</div>
+      <div class="trk-tag" style="color:var(--tx)">The top 10 cryptocurrencies compared by share of their combined market capitalization \u2014 one horizontal bar per coin, each in its traditional brand color.</div>
+      {competition_share_html()}
+    </div>
+
+"""
+
+    _B['cmpnews'] = f"""    <!-- SECTION 36: COMPETITION - COMPETITIVE NEWS (V151) -->
+    <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--tq)"><span class="sic">&#128240;</span> Competitive News</div>
+      <div class="trk-tag" style="color:var(--tx)">The leading story of the last 12 hours for each of the ten coins \u2014 one story per coin with its source, refreshed every 12 hours.</div>
+      {competition_news_html()}
+    </div>
+
+"""
+
+    _B['cmptokens'] = f"""    <!-- SECTION 37: COMPETITION - AVAILABLE TOKENS (V151) -->
+    <div class="acct" style="border-color:rgba(255,153,0,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--or)"><span class="sic">&#129689;</span> Available Tokens</div>
+      <div class="trk-tag" style="color:var(--tx)">Ten supply rings in two rows of five \u2014 each coin\u2019s traditional color shows the share of tokens already purchased into circulation, gray shows what remains available. Resets every morning at 08:00 UTC.</div>
+      {competition_tokens_html()}
+    </div>
+
+"""
+
+    _B['cmprace'] = f"""    <!-- SECTION 38: COMPETITION - 24H PERFORMANCE RACE (V151) -->
+    <div class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--gr)"><span class="sic">&#127937;</span> 24-Hour Performance Race</div>
+      <div class="trk-tag" style="color:var(--tx)">All ten coins ranked by 24-hour price change, fastest mover first.</div>
+      {competition_race_html()}
+    </div>
+
+"""
+
+    _B['cmpath'] = f"""    <!-- SECTION 39: COMPETITION - DISTANCE FROM ATH (V151) -->
+    <div class="acct" style="border-color:rgba(117,188,255,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--bl)"><span class="sic">&#9968;&#65039;</span> Distance From All-Time High</div>
+      <div class="trk-tag" style="color:var(--tx)">How close each coin trades to its own record \u2014 a full bar means the coin sits at its all-time high.</div>
+      {competition_ath_html()}
+    </div>
+
+"""
+
+    _B['cmpvol'] = f"""    <!-- SECTION 40: COMPETITION - 24H VOLUME SHARE (V151) -->
+    <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--yl)"><span class="sic">&#128176;</span> 24h Volume Share</div>
+      <div class="trk-tag" style="color:var(--tx)">Where the day\u2019s trading money is moving \u2014 each coin\u2019s share of the combined top-10 24-hour volume.</div>
+      {competition_vol_html()}
+    </div>
+
+"""
+
+    _B['cmpflip'] = f"""    <!-- SECTION 41: COMPETITION - THE FLIPPENING METER (V151) -->
+    <div class="acct" style="border-color:rgba(0,140,255,.45);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#9878;&#65039;</span> The Flippening Meter</div>
+      <div class="trk-tag" style="color:var(--tx)">XRP measured against every other top-10 asset by market capitalization \u2014 the growth needed to flip the coins above, and the lead XRP holds over the coins below.</div>
+      {competition_flip_html()}
+    </div>
+
+"""
+
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -9819,6 +10212,11 @@ def page_community():
     return Response(replace_flags_with_svg(render_page("community")), mimetype="text/html")
 
 
+@app.route("/competition")
+def page_competition():
+    return Response(replace_flags_with_svg(render_page("competition")), mimetype="text/html")
+
+
 @app.route("/logo.jpg")
 def logo_jpg():
     """The helix, served as embedded."""
@@ -10003,6 +10401,11 @@ except Exception:
 
 try:
     fetch_clarity_tracker()
+except Exception:
+    pass
+
+try:
+    fetch_competition_news()
 except Exception:
     pass
 
