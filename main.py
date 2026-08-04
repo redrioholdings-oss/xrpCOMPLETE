@@ -5,6 +5,17 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V153 changes:
+  1. Five more COMPETITION-page sections, all computed from the top-10
+     dataset the app already fetches (zero new network calls):
+       - Momentum Map: 1h/24h/7d direction dots per coin with a
+         plain-English trend verdict.
+       - Turnover Ratio: 24h volume as a percentage of market cap.
+       - What $100 Buys: token count per coin for a $100 purchase.
+       - Market Cap Ladder: ranked list with the dollar and percentage
+         gap each coin must close to take the rank above it.
+       - XRP Scorecard: XRP's rank (#N of 10) across seven metrics.
+
 V152 changes:
   1. Background-thread startup fix. All three daemon threads (_bg_refresh,
      _bg_news, _bg_brief) were started mid-file, before some of the
@@ -186,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "152"
+APP_VERSION = "153"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -4790,6 +4801,157 @@ def competition_flip_html():
             '<div class="cmp-foot">Market-cap distance between XRP and every other top-10 asset \u2014 the growth required to flip the coins above, and the multiple XRP holds over the coins below.</div>')
 
 
+
+def competition_momentum_html():
+    """Momentum Map: 1h/24h/7d direction per coin with a trend verdict."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    verdicts = {
+        (True, True, True):    ("Full uptrend",   "var(--gr)"),
+        (False, False, False): ("Full downtrend", "var(--rd)"),
+        (True, True, False):   ("Reversing up",   "var(--gr)"),
+        (False, False, True):  ("Pulling back",   "var(--or)"),
+        (True, False, False):  ("Early bounce",   "var(--bl)"),
+        (False, True, True):   ("Cooling off",    "var(--or)"),
+        (True, False, True):   ("Dip within uptrend", "var(--bl)"),
+        (False, True, False):  ("Fading pop",     "var(--or)"),
+    }
+    cards = []
+    for c in rows:
+        col = _coin_color(c["symbol"])
+        key = (c["chg1h"] >= 0, c["chg24h"] >= 0, c["chg7d"] >= 0)
+        verdict, vcol = verdicts[key]
+        dots = "".join(
+            f'<span class="cmp-mom-dot" style="background:{"var(--gr)" if up else "var(--rd)"}" '
+            f'title="{lbl}: {chg:+.2f}%"></span>'
+            for lbl, chg, up in (("1h", c["chg1h"], key[0]), ("24h", c["chg24h"], key[1]), ("7d", c["chg7d"], key[2]))
+        )
+        cards.append(
+            f'<div class="cmp-flip-card"><div class="cmp-flip-h">'
+            f'<span class="cmp-flip-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<span class="cmp-mom-dots">{dots}</span></div>'
+            f'<div class="cmp-flip-v" style="color:{vcol};font-weight:700">{verdict}</div>'
+            f'<div class="cmp-mom-nums">1h {c["chg1h"]:+.2f}% \u2022 24h {c["chg24h"]:+.2f}% \u2022 7d {c["chg7d"]:+.2f}%</div></div>'
+        )
+    return ('<div class="cmp-flip-grid">' + "".join(cards) + "</div>"
+            '<div class="cmp-foot">Three dots per coin \u2014 1-hour, 24-hour and 7-day direction left to right \u2014 with a plain-English read of the pattern. Green dot = gaining over that window, red = losing.</div>')
+
+
+def competition_turnover_html():
+    """Turnover Ratio: 24h volume as a percentage of market cap."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    scored = [(c, (c["vol24"] / c["mcap"] * 100) if c["mcap"] else 0.0) for c in rows]
+    scored.sort(key=lambda t: t[1], reverse=True)
+    peak = max((t for _, t in scored), default=0) or 1
+    out = []
+    for c, ratio in scored:
+        col = _coin_color(c["symbol"])
+        out.append(
+            f'<div class="cmp-bar-row">'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{max(ratio / peak * 100, 1.5):.1f}%;background:{col}"></div></div>'
+            f'<span class="cmp-bar-val">{ratio:.1f}%</span></div>'
+        )
+    return ('<div class="cmp-bars">' + "".join(out) + "</div>"
+            '<div class="cmp-foot">24-hour trading volume as a share of each coin\u2019s market capitalization \u2014 how hard each coin\u2019s float actually works in a day. Stablecoins typically dominate because they are the market\u2019s settlement rails.</div>')
+
+
+def competition_hundred_html():
+    """What $100 Buys: token count per coin for a $100 purchase."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    cards = []
+    for c in rows:
+        col = _coin_color(c["symbol"])
+        if not c["price"]:
+            amt = "\u2014"
+        else:
+            n = 100.0 / c["price"]
+            if n >= 1000:
+                amt = f"{n:,.0f}"
+            elif n >= 1:
+                amt = f"{n:,.2f}"
+            else:
+                amt = f"{n:.6f}"
+        cards.append(
+            f'<div class="cmp-h100-card">'
+            f'<div class="cmp-flip-sym" style="color:{col}">{c["symbol"]}</div>'
+            f'<div class="cmp-h100-amt">{amt}</div>'
+            f'<div class="cmp-h100-sub">at {_fmt_price(c["price"])}</div></div>'
+        )
+    return ('<div class="cmp-h100-grid">' + "".join(cards) + "</div>"
+            '<div class="cmp-foot">How many tokens a flat $100 purchase buys of each coin at the current live price. Illustration only \u2014 exchange fees and spreads not included. Not financial advice.</div>')
+
+
+def competition_ladder_html():
+    """Market Cap Ladder: the gap each coin must close to take the rank above."""
+    rows = MARKET.get("top10") or []
+    if not rows:
+        return _CMP_LOADING
+    ordered = sorted(rows, key=lambda c: c["rank"])
+    peak = ordered[0]["mcap"] or 1
+    out = []
+    for i, c in enumerate(ordered):
+        col = _coin_color(c["symbol"])
+        width = max(c["mcap"] / peak * 100, 1.5)
+        if i == 0:
+            gap_txt = "Top of the ladder"
+        else:
+            above = ordered[i - 1]
+            gap = above["mcap"] - c["mcap"]
+            need = (above["mcap"] / c["mcap"] - 1) * 100 if c["mcap"] else 0
+            gap_txt = f'${_fmt_num(gap)} behind #{above["rank"]} {above["symbol"]} \u2014 needs +{need:,.0f}% to flip'
+        out.append(
+            f'<div class="cmp-lad-row">'
+            f'<span class="cmp-lad-rank">#{c["rank"]}</span>'
+            f'<span class="cmp-bar-sym" style="color:{col}">{c["symbol"]}</span>'
+            f'<div class="cmp-lad-mid"><div class="cmp-bar-track"><div class="cmp-bar-fill" style="width:{width:.1f}%;background:{col}"></div></div>'
+            f'<div class="cmp-lad-gap">{gap_txt}</div></div>'
+            f'<span class="cmp-bar-val">${_fmt_num(c["mcap"])}</span></div>'
+        )
+    return ('<div class="cmp-lad">' + "".join(out) + "</div>"
+            '<div class="cmp-foot">Every rung of the top-10 market-cap ladder, with the exact distance \u2014 in dollars and required growth \u2014 separating each coin from the rank above it. Bars are scaled to the #1 coin.</div>')
+
+
+def competition_scorecard_html():
+    """XRP Scorecard: XRP's rank among the ten across seven metrics."""
+    rows = MARKET.get("top10") or []
+    xrp = next((c for c in rows if c["symbol"] == "XRP"), None)
+    if not rows or not xrp:
+        return _CMP_LOADING
+    def _rank_of(key_fn, best_high=True):
+        ordered = sorted(rows, key=key_fn, reverse=best_high)
+        for i, c in enumerate(ordered, 1):
+            if c["symbol"] == "XRP":
+                return i
+        return len(rows)
+    metrics = [
+        ("Market Cap",      _rank_of(lambda c: c["mcap"])),
+        ("24h Volume",      _rank_of(lambda c: c["vol24"])),
+        ("1h Change",       _rank_of(lambda c: c["chg1h"])),
+        ("24h Change",      _rank_of(lambda c: c["chg24h"])),
+        ("7d Change",       _rank_of(lambda c: c["chg7d"])),
+        ("Turnover",        _rank_of(lambda c: (c["vol24"] / c["mcap"]) if c["mcap"] else 0)),
+        ("Closest to ATH",  _rank_of(lambda c: c["pct_from_ath"])),
+    ]
+    def _rank_col(r):
+        if r <= 3:  return "var(--gr)"
+        if r <= 6:  return "var(--bl)"
+        return "var(--or)"
+    cards = "".join(
+        f'<div class="cmp-score-card"><div class="cmp-score-lbl">{lbl}</div>'
+        f'<div class="cmp-score-rank" style="color:{_rank_col(r)}">#{r}<span class="cmp-score-of">/10</span></div></div>'
+        for lbl, r in metrics
+    )
+    avg = sum(r for _, r in metrics) / len(metrics)
+    return ('<div class="cmp-score-grid">' + cards + "</div>"
+            f'<div class="cmp-foot">XRP\u2019s standing among the ten on each metric, refreshed with the live rankings \u2014 average position this cycle: #{avg:.1f}. Green = top three, blue = middle of the pack, orange = bottom four.</div>')
+
+
 def signal_stats():
     pool = NEWS.get("pool", [])
     total = len(pool)
@@ -8117,6 +8279,26 @@ def render_page(page="main"):
   .cmp-flip-v b{{ color:var(--hdr); }}
   @media(max-width:900px){{ .cmp-pies{{ grid-template-columns:repeat(3,1fr); }} .cmp-news-grid{{ grid-template-columns:1fr; }} .cmp-flip-grid{{ grid-template-columns:1fr 1fr; }} }}
   @media(max-width:520px){{ .cmp-pies{{ grid-template-columns:repeat(2,1fr); }} .cmp-flip-grid{{ grid-template-columns:1fr; }} }}
+  /* Competition page additions (V153) */
+  .cmp-mom-dots{{ display:flex; gap:5px; align-items:center; }}
+  .cmp-mom-dot{{ width:11px; height:11px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.4); }}
+  .cmp-mom-nums{{ font-family:var(--mn); font-size:11px; color:var(--tx); margin-top:5px; }}
+  .cmp-h100-grid{{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }}
+  .cmp-h100-card{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:11px 12px; text-align:center; }}
+  .cmp-h100-amt{{ font-family:var(--mn); font-size:17px; font-weight:800; color:var(--br); margin:5px 0 3px; word-break:break-all; }}
+  .cmp-h100-sub{{ font-size:11px; color:var(--tx); }}
+  .cmp-lad{{ display:flex; flex-direction:column; gap:9px; }}
+  .cmp-lad-row{{ display:flex; align-items:center; gap:10px; }}
+  .cmp-lad-rank{{ font-family:var(--mn); font-size:12px; font-weight:800; color:var(--tx); width:30px; flex-shrink:0; text-align:right; }}
+  .cmp-lad-mid{{ flex:1; min-width:0; }}
+  .cmp-lad-gap{{ font-size:11px; color:var(--tx); font-family:var(--mn); margin-top:3px; }}
+  .cmp-score-grid{{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }}
+  .cmp-score-card{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:12px 13px; text-align:center; }}
+  .cmp-score-lbl{{ font-size:12px; color:var(--tx); margin-bottom:4px; }}
+  .cmp-score-rank{{ font-family:var(--mn); font-size:22px; font-weight:900; }}
+  .cmp-score-of{{ font-size:12px; color:var(--tx); font-weight:400; }}
+  @media(max-width:900px){{ .cmp-h100-grid{{ grid-template-columns:repeat(3,1fr); }} .cmp-score-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:520px){{ .cmp-h100-grid{{ grid-template-columns:repeat(2,1fr); }} .cmp-bar-val{{ width:56px; font-size:11px; }} }}
   /* ---- V121 six-page navigation ---- */
   .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
          border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
@@ -9750,7 +9932,52 @@ def render_page(page="main"):
 
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip']}
+    _B['cmpmomentum'] = f"""    <!-- SECTION 42: COMPETITION - MOMENTUM MAP (V153) -->
+    <div class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--gr)"><span class="sic">&#129517;</span> Momentum Map</div>
+      <div class="trk-tag" style="color:var(--tx)">Each coin\u2019s 1-hour, 24-hour and 7-day direction at a glance, with a plain-English read of the pattern.</div>
+      {competition_momentum_html()}
+    </div>
+
+"""
+
+    _B['cmpturnover'] = f"""    <!-- SECTION 43: COMPETITION - TURNOVER RATIO (V153) -->
+    <div class="acct" style="border-color:rgba(0,229,204,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--tq)"><span class="sic">&#128260;</span> Turnover Ratio</div>
+      <div class="trk-tag" style="color:var(--tx)">24-hour volume as a share of market cap \u2014 which coins actually work their float, and which sit still.</div>
+      {competition_turnover_html()}
+    </div>
+
+"""
+
+    _B['cmphundred'] = f"""    <!-- SECTION 44: COMPETITION - WHAT $100 BUYS (V153) -->
+    <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--yl)"><span class="sic">&#128181;</span> What $100 Buys</div>
+      <div class="trk-tag" style="color:var(--tx)">The token count a flat $100 purchase gets you in each of the ten, at live prices.</div>
+      {competition_hundred_html()}
+    </div>
+
+"""
+
+    _B['cmpladder'] = f"""    <!-- SECTION 45: COMPETITION - MARKET CAP LADDER (V153) -->
+    <div class="acct" style="border-color:rgba(117,188,255,.4);margin:10px 0">
+      <div class="sec-title" style="color:var(--bl)"><span class="sic">&#129699;</span> Market Cap Ladder</div>
+      <div class="trk-tag" style="color:var(--tx)">All ten rungs of the market-cap ladder and the exact gap \u2014 dollars and growth required \u2014 between each coin and the rank above it.</div>
+      {competition_ladder_html()}
+    </div>
+
+"""
+
+    _B['cmpscore'] = f"""    <!-- SECTION 46: COMPETITION - XRP SCORECARD (V153) -->
+    <div class="acct" style="border-color:rgba(0,140,255,.45);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">&#128203;</span> XRP Scorecard</div>
+      <div class="trk-tag" style="color:var(--tx)">Where XRP stands among the ten on every metric this page tracks \u2014 one rank badge per category.</div>
+      {competition_scorecard_html()}
+    </div>
+
+"""
+
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
