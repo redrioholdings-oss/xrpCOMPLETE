@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "160"
+APP_VERSION = "161"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14578,7 +14578,7 @@ def render_page(page="main"):
   #breaking{{ background:var(--s1); padding:8px 0; overflow:hidden; }}
   .bkinner{{ max-width:2400px; margin:0 auto; padding:0 28px; }}
   .bkrow{{ display:flex; align-items:center; width:100%; padding-bottom:8px; border-bottom:2px solid var(--hdr); }}
-  .bklbl{{ color:var(--hdr); font-weight:900; font-size:17px; font-family:var(--mn); flex-shrink:0; padding-right:14px; margin-right:14px; border-right:2px solid rgba(3,177,252,.5); text-transform:uppercase; letter-spacing:.08em; display:inline-flex; align-items:center; gap:9px; }}
+  .bklbl{{ color:#008CFF; font-weight:900; font-size:17px; font-family:var(--mn); flex-shrink:0; padding-right:14px; margin-right:14px; border-right:2px solid rgba(3,177,252,.5); text-transform:uppercase; letter-spacing:.08em; display:inline-flex; align-items:center; gap:9px; }}
   .bk-bolt{{ font-size:22px; }}
   .bkscroll{{ flex:1; overflow:hidden; height:26px; position:relative; display:flex; align-items:center; }}
   .bktext{{ display:inline-block; animation:bkscroll 45s linear infinite; white-space:nowrap; will-change:transform; padding-left:100%; font-size:15px; color:var(--br); font-family:system-ui; font-weight:500; line-height:26px; }}
@@ -15605,25 +15605,25 @@ def render_page(page="main"):
            box-shadow:0 0 6px var(--gr); display:inline-block; }}
   .us-c{{ color:#CC5F00; }}
   .us-r{{ color:#E0447C; }}
-  .hero{{ position:relative; overflow:hidden; min-height:440px;
+  .hero{{ position:relative; overflow:hidden; min-height:572px;
          display:flex; align-items:center; background:#02040a; }}
   .hero-art{{ position:absolute; top:0; right:0; height:100%; width:72%;
              object-fit:cover; object-position:center; z-index:0; }}
   .hero-fade{{ position:absolute; inset:0; z-index:1;
       background:linear-gradient(90deg,#02040a 0%,#02040a 30%,rgba(2,4,10,.55) 52%,rgba(2,4,10,0) 78%); }}
-  .hero-l{{ position:relative; z-index:2; max-width:640px; padding:38px 0 40px; }}
-  .hero-h{{ margin:0 0 16px; color:#fff; font-size:46px; line-height:1.12;
+  .hero-l{{ position:relative; z-index:2; max-width:830px; padding:50px 0 52px; }}
+  .hero-h{{ margin:0 0 20px; color:#fff; font-size:60px; line-height:1.12;
            font-weight:800; letter-spacing:0.5px; }}
   .hero-new{{ color:#008CFF; font-style:italic; }}
-  .hero-sub{{ margin:0 0 26px; color:var(--tx); font-size:17px; line-height:1.5;
-             max-width:520px; }}
-  .feats{{ display:flex; margin:0 0 28px; }}
+  .hero-sub{{ margin:0 0 34px; color:var(--tx); font-size:22px; line-height:1.5;
+             max-width:675px; }}
+  .feats{{ display:flex; margin:0 0 36px; }}
   .feat{{ flex:1; display:flex; flex-direction:column; align-items:center; gap:9px;
          padding:0 12px; text-align:center; border-left:1px solid rgba(0,140,255,.25); }}
   .feat:first-child{{ border-left:none; padding-left:0; }}
-  .feat svg{{ width:32px; height:32px; stroke:#008CFF; fill:none; stroke-width:1.6;
+  .feat svg{{ width:42px; height:42px; stroke:#008CFF; fill:none; stroke-width:1.6;
              stroke-linecap:round; stroke-linejoin:round; }}
-  .feat span{{ font-size:11px; font-weight:700; letter-spacing:1.3px; color:#dfe7f2;
+  .feat span{{ font-size:14px; font-weight:700; letter-spacing:1.5px; color:#dfe7f2;
               line-height:1.45; }}
   .hero-cta{{ display:inline-block; background:#008CFF; color:#fff; font-weight:800;
              font-size:14px; letter-spacing:1.5px; padding:13px 24px; border-radius:7px;
@@ -15661,6 +15661,12 @@ def render_page(page="main"):
             font-size:13px; letter-spacing:2px; text-decoration:none;
             border:1px solid #008CFF; border-radius:7px; padding:10px 0; }}
   .hc-blog:hover{{ background:rgba(0,140,255,.12); }}
+  /* V161: BLOG button moved to hero (keeps its card size); LATEST BRIEFING now in card */
+  .hero-blogbtn{{ display:inline-block; width:216px; }}
+  .hc-brief{{ display:block; text-align:center; background:#008CFF; color:#fff;
+             font-weight:800; font-size:13px; letter-spacing:2px; text-decoration:none;
+             border-radius:7px; padding:10px 0; }}
+  .hc-brief:hover{{ background:#1e9bff; }}
   @media(max-width:940px){{
     .hero{{ flex-direction:column; align-items:stretch; min-height:0; }}
     .hero-art{{ width:100%; opacity:.28; }}
@@ -15683,7 +15689,7 @@ def render_page(page="main"):
   .xnav a{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
            gap:3px; min-width:52px; height:58px; padding:5px 8px; border-radius:8px;
            background:transparent; text-decoration:none; }}
-  .xnav a svg{{ width:26px; height:26px; display:block;
+  .xnav a svg{{ width:36px; height:36px; display:block;
                stroke:#008CFF; fill:none; stroke-width:1.8;
                stroke-linecap:round; stroke-linejoin:round; }}
   .xnav a .nv-t{{ font-size:9px; font-weight:700; letter-spacing:0.8px; color:#fff;
@@ -15691,7 +15697,7 @@ def render_page(page="main"):
   .xnav a:hover{{ background:rgba(0,140,255,.15); }}
   .xnav a.on{{ background:rgba(0,140,255,.20); box-shadow:inset 0 0 0 1px #008CFF; }}
   @media(max-width:768px){{ .xnav a{{ min-width:40px; height:50px; padding:4px 4px; border-radius:6px; }}
-                           .xnav a svg{{ width:20px; height:20px; }}
+                           .xnav a svg{{ width:28px; height:28px; }}
                            .xnav a .nv-t{{ font-size:7px; letter-spacing:0.4px; }}
                            .xnav-in{{ gap:8px; flex-wrap:wrap; }} }}
 </style>
@@ -15782,7 +15788,7 @@ def render_page(page="main"):
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.3 2.6 14.7 0 17-2.6-2.3-2.6-14.7 0-17z"/></svg><span>INSTITUTIONAL<br>ADOPTION</span></div>
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8"/><circle cx="5" cy="5" r="1.8"/><circle cx="19" cy="5" r="1.8"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="19" r="1.8"/><path d="M6.3 6.3 10.7 10.7M17.7 6.3 13.3 10.7M6.3 17.7 10.7 13.3M17.7 17.7 13.3 13.3"/></svg><span>XRPL<br>ECOSYSTEM</span></div>
           </div>
-          <a class="hero-cta" href="/#brief">LATEST BRIEFING <span class="cta-ar">&#8594;</span></a>
+          <a class="hc-blog hero-blogbtn" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
         </div>
         <div class="hero-card">
           <span class="hc-live"><span class="hc-live-dot"></span>LIVE</span>
@@ -15795,7 +15801,7 @@ def render_page(page="main"):
             <div class="hc-cell"><span class="hc-n" id="hb-m">--</span><span class="hc-u">MIN</span></div>
             <div class="hc-cell"><span class="hc-n" id="hb-s">--</span><span class="hc-u">SEC</span></div>
           </div>
-          <a class="hc-blog" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
+          <a class="hc-brief" href="/#brief">LATEST BRIEFING <span class="cta-ar">&#8594;</span></a>
         </div>
       </div>
     </div>
