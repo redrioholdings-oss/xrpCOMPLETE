@@ -5,6 +5,17 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V152 changes:
+  1. Background-thread startup fix. All three daemon threads (_bg_refresh,
+     _bg_news, _bg_brief) were started mid-file, before some of the
+     functions their loops call were defined (load_static_partner_directory,
+     fetch_news, fetch_exec_tracker, fetch_clarity_tracker, _brief_slot,
+     generate_brief). Each thread's first pass therefore raised a silently
+     caught NameError, wasting one full cycle (up to 60 minutes for the
+     hourly static-partner check). The three .start() calls now run at the
+     very bottom of the file, after every definition and after the initial
+     synchronous startup fetches. The thread loop bodies are unchanged.
+
 V151 changes:
   1. New COMPETITION page (/competition) added to the site navigation with
      seven sections, all powered by data the app already fetches (the V149
@@ -175,7 +186,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "151"
+APP_VERSION = "152"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -2946,7 +2957,7 @@ def _bg_refresh():
         n += 1
         time.sleep(60)
 
-threading.Thread(target=_bg_refresh, daemon=True).start()
+# V152: thread started at end of file, after all definitions.
 
 def _bg_news():
     n = 0
@@ -2965,7 +2976,7 @@ def _bg_news():
         n += 1
         time.sleep(300)
 
-threading.Thread(target=_bg_news, daemon=True).start()
+# V152: thread started at end of file, after all definitions.
 
 def _bg_brief():
     while True:
@@ -2977,7 +2988,7 @@ def _bg_brief():
             pass
         time.sleep(60)
 
-threading.Thread(target=_bg_brief, daemon=True).start()
+# V152: thread started at end of file, after all definitions.
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -10423,6 +10434,17 @@ try:
     generate_brief()
 except Exception:
     pass
+
+
+# ─────────────────────────────────────────────────────────────────────
+# BACKGROUND THREADS (V152) — started here, at the very end of the
+# module, so every function their loops call is guaranteed to exist
+# before the first pass runs. Previously these started mid-file and each
+# thread's first iteration died on a silently caught NameError.
+# ─────────────────────────────────────────────────────────────────────
+threading.Thread(target=_bg_refresh, daemon=True).start()
+threading.Thread(target=_bg_news, daemon=True).start()
+threading.Thread(target=_bg_brief, daemon=True).start()
 
 
 if __name__ == "__main__":
