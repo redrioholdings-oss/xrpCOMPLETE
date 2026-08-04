@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "163"
+APP_VERSION = "164"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -15600,11 +15600,12 @@ def render_page(page="main"):
            background:rgba(0,140,255,.06);
            border-top:1px solid rgba(0,140,255,.28);
            border-bottom:1px solid rgba(0,140,255,.28); }}
-  .us-l{{ color:#008CFF; display:flex; align-items:center; gap:7px; }}
+  /* V164: strip lettering white across the bar */
+  .us-l{{ color:#fff; display:flex; align-items:center; gap:7px; }}
   .us-dot{{ width:7px; height:7px; border-radius:50%; background:var(--gr);
            box-shadow:0 0 6px var(--gr); display:inline-block; }}
-  .us-c{{ color:#CC5F00; }}
-  .us-r{{ color:#E0447C; }}
+  .us-c{{ color:#fff; }}
+  .us-r{{ color:#fff; }}
   .hero{{ position:relative; overflow:hidden; min-height:440px;
          display:flex; align-items:center; background:#02040a; }}
   /* V162: astronaut artwork itself 30% larger, centered overflow cropped */
