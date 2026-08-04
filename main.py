@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "153"
+APP_VERSION = "156"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -8305,24 +8305,62 @@ def render_page(page="main"):
          padding:10px 0; }}
   .xnav-in{{ max-width:1280px; margin:0 auto; padding:0 10px;
             display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }}
-  .xnav a{{ display:inline-block; padding:8px 18px; border:1px solid var(--hdr);
-           border-radius:4px; background:transparent; color:var(--hdr);
-           font-family:var(--mn); font-size:15px; font-weight:700; letter-spacing:1.5px;
-           text-decoration:none; white-space:nowrap; line-height:1.1; }}
-  .xnav a:hover{{ background:rgba(3,177,252,.15); }}
-  .xnav a.on{{ background:var(--hdr); color:#000; font-weight:800; }}
-  @media(max-width:480px){{ .xnav a{{ padding:7px 13px; font-size:12px; letter-spacing:1px; }}
-                           .xnav-in{{ gap:6px; }} }}
+  /* V154: nine horizontal icon links (#008CFF) replace the text pills */
+  .xnav a{{ display:flex; align-items:center; justify-content:center;
+           width:46px; height:42px; border-radius:8px; background:transparent;
+           text-decoration:none; line-height:0; }}
+  .xnav a svg{{ width:30px; height:30px; display:block;
+               stroke:#008CFF; fill:none; stroke-width:1.8;
+               stroke-linecap:round; stroke-linejoin:round; }}
+  .xnav a:hover{{ background:rgba(0,140,255,.15); }}
+  .xnav a.on{{ background:rgba(0,140,255,.20); box-shadow:inset 0 0 0 1px #008CFF; }}
+  @media(max-width:480px){{ .xnav a{{ width:34px; height:34px; border-radius:6px; }}
+                           .xnav a svg{{ width:23px; height:23px; }}
+                           .xnav-in{{ gap:4px; }} }}
 </style>
 </head>
 """
 
+    # V154: nav icons, one per page in site order. Inline SVG, stroke
+    # inherited from .xnav a svg CSS (#008CFF). Icon 9 opens the blog.
+    _ic = {
+        "main":          '<svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/>'
+                         '<path d="M5.5 10v10h13V10"/><path d="M10 20v-5.5h4V20"/></svg>',
+        "markets":       '<svg viewBox="0 0 24 24"><path d="M3 18 9.5 11l3.5 3.5L20 7"/>'
+                         '<path d="M15.5 7H20v4.5"/></svg>',
+        "news":          '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="14" height="14" rx="1.5"/>'
+                         '<path d="M17 8h2.5a1.5 1.5 0 0 1 1.5 1.5V17a2 2 0 0 1-2 2H5"/>'
+                         '<rect x="6" y="8" width="4" height="4"/>'
+                         '<path d="M13 8.5h1.5M13 11.5h1.5M6 15h8.5"/></svg>',
+        "institutional": '<svg viewBox="0 0 24 24"><path d="M3 9 12 4l9 5H3z"/>'
+                         '<path d="M6 9v8M10 9v8M14 9v8M18 9v8"/><path d="M4 17h16M3 20h18"/></svg>',
+        "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 4v14M9 20h6M5 7h14"/>'
+                         '<path d="M5 7 2.8 12M5 7l2.2 5"/><path d="M2.8 12a2.4 2.4 0 0 0 4.4 0z"/>'
+                         '<path d="M19 7l-2.2 5M19 7l2.2 5"/><path d="M16.8 12a2.4 2.4 0 0 0 4.4 0z"/></svg>',
+        "community":     '<svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.2"/>'
+                         '<path d="M9 11.2a3.2 3.2 0 0 1 6 0"/><circle cx="5.5" cy="14" r="2.2"/>'
+                         '<path d="M2.5 19.7a3.2 3.2 0 0 1 6 0"/><circle cx="18.5" cy="14" r="2.2"/>'
+                         '<path d="M15.5 19.7a3.2 3.2 0 0 1 6 0"/></svg>',
+        "competition":   '<svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/>'
+                         '<path d="M8 5H5a3 3 0 0 0 3.4 3.4M16 5h3a3 3 0 0 1-3.4 3.4"/>'
+                         '<path d="M12 13v3M9 19h6M10 16h4v3h-4z"/>'
+                         '<path d="m12 6.2.7 1.4 1.5.2-1.1 1.1.3 1.5-1.4-.7-1.4.7.3-1.5-1.1-1.1 1.5-.2z"/></svg>',
+        "about":         '<svg viewBox="0 0 24 24"><path d="M16.5 17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5h11a1.5 1.5 0 0 1 1.5 1.5V11"/>'
+                         '<path d="M6.5 8.5h6M6.5 11h6M6.5 13.5h4"/>'
+                         '<path d="m14 18.6 5.6-5.6 1.9 1.9-5.6 5.6H14z"/></svg>',
+        "blog":          '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="5.5" height="16" rx="0.8"/>'
+                         '<rect x="13" y="4" width="5.5" height="16" rx="0.8"/>'
+                         '<path d="M5 7.5h5.5M13 7.5h5.5M5 16.5h5.5M13 16.5h5.5"/></svg>',
+    }
     _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
               ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
               ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"),
-              ("competition","/competition","COMPETITION"))
+              ("competition","/competition","COMPETITION"), ("about","/about","ABOUT US"),
+              ("blog","https://xrpcompleteblog.com","XRP COMPLETE BLOG"))
     _nav = ('<nav class="xnav"><div class="xnav-in">' + ''.join(
-        f'<a href="{h}" class="{"on" if k == page else ""}">{t}</a>'
+        f'<a href="{h}" class="{"on" if k == page else ""}" title="{t}" aria-label="{t}"'
+        + (' target="_blank" rel="noopener"' if k == "blog" else '')
+        + f'>{_ic[k]}</a>'
         for k, h, t in _pages) + '</div></nav>')
 
     _chrome = f"""<body id="top">
