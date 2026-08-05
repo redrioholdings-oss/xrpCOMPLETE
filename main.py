@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "165"
+APP_VERSION = "166"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14180,7 +14180,7 @@ def render_page(page="main"):
   .hdr2{{ margin:0 0 0; }}
   /* V158: title row shares the line with the breaking bar; bar clips at the
      title's edge (overflow) and never overlaps it. Title at half size. */
-  .hdr2-toprow{{ display:flex; align-items:center; gap:18px; padding:8px 0 6px; }}
+  .hdr2-toprow{{ display:flex; align-items:center; gap:18px; padding:10px 0 8px; }}
   .hdr2-top{{ display:flex; align-items:center; gap:8px; flex-shrink:0; }}
   /* V159: helix at half size; scoped to beat the global .icon img 125px rule */
   .hdr2-top .icon{{ height:62px; }}
@@ -14192,7 +14192,7 @@ def render_page(page="main"):
   .h2-x{{ color:#fff; }} .h2-c{{ color:#008CFF; }}
   .h2-net{{ font-size:8px; color:var(--tx); letter-spacing:2px; margin-top:2px; }}
   .ustrip{{ display:flex; align-items:center; justify-content:space-between; gap:14px;
-           flex-wrap:wrap; padding:8px 12px; font-size:12.5px; font-weight:700;
+           flex-wrap:wrap; padding:10px 12px; font-size:12.5px; font-weight:700;
            letter-spacing:1.2px; font-family:var(--mn);
            background:rgba(0,140,255,.06);
            border-top:1px solid rgba(0,140,255,.28);
@@ -14203,7 +14203,7 @@ def render_page(page="main"):
            box-shadow:0 0 6px var(--gr); display:inline-block; }}
   .us-c{{ color:#fff; }}
   .us-r{{ color:#fff; }}
-  .hero{{ position:relative; overflow:hidden; min-height:440px;
+  .hero{{ position:relative; overflow:hidden; min-height:484px;
          display:flex; align-items:center; background:#02040a; }}
   /* V162: astronaut artwork itself 30% larger, centered overflow cropped */
   .hero-art{{ position:absolute; top:-15%; right:0; height:130%; width:72%;
@@ -14231,7 +14231,7 @@ def render_page(page="main"):
   .cta-ar{{ margin-left:6px; }}
   /* V165: card taller and thinner */
   .hero-card{{ position:absolute; z-index:3; right:14px; top:50%; transform:translateY(-50%);
-              width:210px; padding:24px 14px 22px; border-radius:12px;
+              width:160px; padding:24px 14px 22px; border-radius:12px;
               background:rgba(8,13,24,.74); border:1px solid rgba(130,160,200,.35);
               backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }}
   .hc-live{{ display:inline-flex; align-items:center; gap:7px; font-family:var(--mn);
@@ -14242,11 +14242,11 @@ def render_page(page="main"):
                 box-shadow:0 0 6px var(--gr); animation:hcblink 1.5s ease-in-out infinite; }}
   @keyframes hcblink{{ 0%,100%{{ opacity:1; }} 50%{{ opacity:.15; }} }}
   .hc-row{{ display:flex; justify-content:space-between; align-items:flex-start;
-           gap:10px; margin:10px 0; }}
+           gap:4px 10px; margin:10px 0; flex-wrap:wrap; }}
   .hc-k{{ font-size:11.5px; letter-spacing:1.5px; color:var(--tx); font-weight:700;
          padding-top:2px; }}
-  .hc-v{{ font-size:13.5px; color:#eaf2ff; font-weight:700; text-align:right;
-         line-height:1.45; font-family:var(--mn); }}
+  .hc-v{{ font-size:12.5px; color:#eaf2ff; font-weight:700; text-align:right;
+         line-height:1.45; font-family:var(--mn); margin-left:auto; }}
   .hc-div{{ height:1px; background:rgba(130,160,200,.3); margin:16px 0; }}
   .hc-nb{{ font-size:12px; font-weight:800; letter-spacing:1.5px; color:#008CFF;
           margin-bottom:10px; }}
@@ -14264,8 +14264,8 @@ def render_page(page="main"):
   /* V161: BLOG button moved to hero (keeps its card size); LATEST BRIEFING now in card */
   .hero-blogbtn{{ display:inline-block; width:216px; }}
   .hc-brief{{ display:block; text-align:center; background:#008CFF; color:#fff;
-             font-weight:800; font-size:13px; letter-spacing:2px; text-decoration:none;
-             border-radius:7px; padding:10px 0; }}
+             font-weight:800; font-size:11px; letter-spacing:1px; text-decoration:none;
+             border-radius:7px; padding:10px 0; white-space:nowrap; }}
   .hc-brief:hover{{ background:#1e9bff; }}
   @media(max-width:940px){{
     .hero{{ flex-direction:column; align-items:stretch; min-height:0; }}
@@ -14287,17 +14287,17 @@ def render_page(page="main"):
             display:flex; justify-content:center; flex-wrap:wrap; gap:30px; }}
   /* V154 icons / V159: bar 35% taller, white page titles under icons, 30px gaps */
   .xnav a{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
-           gap:3px; min-width:52px; height:58px; padding:5px 8px; border-radius:8px;
+           gap:3px; min-width:60px; height:69px; padding:5px 8px; border-radius:8px;
            background:transparent; text-decoration:none; }}
-  .xnav a svg{{ width:36px; height:36px; display:block;
+  .xnav a svg{{ width:47px; height:47px; display:block;
                stroke:#008CFF; fill:none; stroke-width:1.8;
                stroke-linecap:round; stroke-linejoin:round; }}
   .xnav a .nv-t{{ font-size:9px; font-weight:700; letter-spacing:0.8px; color:#fff;
                  line-height:1; white-space:nowrap; }}
   .xnav a:hover{{ background:rgba(0,140,255,.15); }}
   .xnav a.on{{ background:rgba(0,140,255,.20); box-shadow:inset 0 0 0 1px #008CFF; }}
-  @media(max-width:768px){{ .xnav a{{ min-width:40px; height:50px; padding:4px 4px; border-radius:6px; }}
-                           .xnav a svg{{ width:28px; height:28px; }}
+  @media(max-width:768px){{ .xnav a{{ min-width:46px; height:58px; padding:4px 4px; border-radius:6px; }}
+                           .xnav a svg{{ width:36px; height:36px; }}
                            .xnav a .nv-t{{ font-size:7px; letter-spacing:0.4px; }}
                            .xnav-in{{ gap:8px; flex-wrap:wrap; }} }}
 </style>
