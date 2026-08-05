@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "167"
+APP_VERSION = "168"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14264,9 +14264,12 @@ def render_page(page="main"):
   .hc-blog:hover{{ background:rgba(0,140,255,.12); }}
   /* V161: BLOG button moved to hero (keeps its card size); LATEST BRIEFING now in card */
   .hero-blogbtn{{ display:inline-block; width:216px; }}
-  .hc-brief{{ display:block; text-align:center; background:#008CFF; color:#fff;
+  /* V168: flex centering so the label is dead-center regardless of arrow margin */
+  .hc-brief{{ display:flex; align-items:center; justify-content:center; gap:6px;
+             background:#008CFF; color:#fff;
              font-weight:800; font-size:12px; letter-spacing:1px; text-decoration:none;
              border-radius:7px; padding:10px 0; white-space:nowrap; }}
+  .hc-brief .cta-ar{{ margin-left:0; }}
   .hc-brief:hover{{ background:#1e9bff; }}
   @media(max-width:940px){{
     .hero{{ flex-direction:column; align-items:stretch; min-height:0; }}
