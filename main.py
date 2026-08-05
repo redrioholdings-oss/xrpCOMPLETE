@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "166"
+APP_VERSION = "167"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14235,27 +14235,28 @@ def render_page(page="main"):
               background:rgba(8,13,24,.74); border:1px solid rgba(130,160,200,.35);
               backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }}
   .hc-live{{ display:inline-flex; align-items:center; gap:7px; font-family:var(--mn);
-            font-size:12px; font-weight:800; letter-spacing:2px; color:var(--gr);
+            font-size:12px; font-weight:800; letter-spacing:1.2px; color:var(--gr);
             border:1px solid rgba(72,255,130,.5); background:rgba(72,255,130,.08);
             padding:4px 12px; border-radius:6px; margin-bottom:18px; }}
   .hc-live-dot{{ width:7px; height:7px; border-radius:50%; background:var(--gr);
                 box-shadow:0 0 6px var(--gr); animation:hcblink 1.5s ease-in-out infinite; }}
   @keyframes hcblink{{ 0%,100%{{ opacity:1; }} 50%{{ opacity:.15; }} }}
-  .hc-row{{ display:flex; justify-content:space-between; align-items:flex-start;
-           gap:4px 10px; margin:10px 0; flex-wrap:wrap; }}
+  /* V167: contents proportioned for the 160px card */
+  .hc-row{{ display:flex; flex-direction:column; align-items:flex-start;
+           gap:3px; margin:11px 0; }}
   .hc-k{{ font-size:11.5px; letter-spacing:1.5px; color:var(--tx); font-weight:700;
          padding-top:2px; }}
-  .hc-v{{ font-size:12.5px; color:#eaf2ff; font-weight:700; text-align:right;
-         line-height:1.45; font-family:var(--mn); margin-left:auto; }}
+  .hc-v{{ font-size:12.5px; color:#eaf2ff; font-weight:700; text-align:left;
+         line-height:1.45; font-family:var(--mn); }}
   .hc-div{{ height:1px; background:rgba(130,160,200,.3); margin:16px 0; }}
-  .hc-nb{{ font-size:12px; font-weight:800; letter-spacing:1.5px; color:#008CFF;
+  .hc-nb{{ font-size:12px; font-weight:800; letter-spacing:1.2px; color:#008CFF;
           margin-bottom:10px; }}
   .hc-nb-i{{ margin-right:4px; }}
   .hc-cd{{ display:flex; margin-bottom:18px; }}
   .hc-cell{{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
             border-left:1px solid rgba(130,160,200,.3); }}
   .hc-cell:first-child{{ border-left:none; }}
-  .hc-n{{ font-family:var(--mn); font-size:23px; font-weight:800; color:#fff; }}
+  .hc-n{{ font-family:var(--mn); font-size:19px; font-weight:800; color:#fff; }}
   .hc-u{{ font-size:10px; letter-spacing:1.5px; color:var(--tx); font-weight:700; }}
   .hc-blog{{ display:block; text-align:center; color:#008CFF; font-weight:800;
             font-size:13px; letter-spacing:2px; text-decoration:none;
@@ -14264,7 +14265,7 @@ def render_page(page="main"):
   /* V161: BLOG button moved to hero (keeps its card size); LATEST BRIEFING now in card */
   .hero-blogbtn{{ display:inline-block; width:216px; }}
   .hc-brief{{ display:block; text-align:center; background:#008CFF; color:#fff;
-             font-weight:800; font-size:11px; letter-spacing:1px; text-decoration:none;
+             font-weight:800; font-size:12px; letter-spacing:1px; text-decoration:none;
              border-radius:7px; padding:10px 0; white-space:nowrap; }}
   .hc-brief:hover{{ background:#1e9bff; }}
   @media(max-width:940px){{
