@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "169"
+APP_VERSION = "170"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14318,11 +14318,15 @@ def render_page(page="main"):
                          '<path d="M17 8h2.5a1.5 1.5 0 0 1 1.5 1.5V17a2 2 0 0 1-2 2H5"/>'
                          '<rect x="6" y="8" width="4" height="4"/>'
                          '<path d="M13 8.5h1.5M13 11.5h1.5M6 15h8.5"/></svg>',
-        "institutional": '<svg viewBox="0 0 24 24"><path d="M3 9 12 4l9 5H3z"/>'
-                         '<path d="M6 9v8M10 9v8M14 9v8M18 9v8"/><path d="M4 17h16M3 20h18"/></svg>',
-        "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 4v14M9 20h6M5 7h14"/>'
-                         '<path d="M5 7 2.8 12M5 7l2.2 5"/><path d="M2.8 12a2.4 2.4 0 0 0 4.4 0z"/>'
-                         '<path d="M19 7l-2.2 5M19 7l2.2 5"/><path d="M16.8 12a2.4 2.4 0 0 0 4.4 0z"/></svg>',
+        "institutional": '<svg viewBox="0 0 24 24"><path d="M5 21V8h5.5v13"/>'
+                         '<path d="M13.5 21V4H19v13"/><path d="M19 17v4"/>'
+                         '<path d="M7 11h1.5M7 14h1.5M7 17h1.5"/>'
+                         '<path d="M15.5 7h1.5M15.5 10h1.5M15.5 13h1.5M15.5 16h1.5"/>'
+                         '<path d="M3 21h18"/></svg>',
+        "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 2v2"/>'
+                         '<path d="M8.5 8.5a3.5 3.5 0 0 1 7 0"/><path d="M7.5 8.5h9"/>'
+                         '<path d="M5.5 11.5h13"/><path d="M7 11.5v6.5M10.3 11.5v6.5M13.7 11.5v6.5M17 11.5v6.5"/>'
+                         '<path d="M4.5 18h15M3.5 21h17"/></svg>',
         "community":     '<svg viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="2.2"/>'
                          '<path d="M9 11.2a3.2 3.2 0 0 1 6 0"/><circle cx="5.5" cy="14" r="2.2"/>'
                          '<path d="M2.5 19.7a3.2 3.2 0 0 1 6 0"/><circle cx="18.5" cy="14" r="2.2"/>'
