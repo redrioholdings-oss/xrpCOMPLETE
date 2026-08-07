@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "170"
+APP_VERSION = "171"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -13167,6 +13167,7 @@ def render_page(page="main"):
     --mn:'Courier New',monospace;
   }}
   *{{ box-sizing:border-box; }}
+  html{{ -webkit-text-size-adjust:100%; text-size-adjust:100%; overflow-x:clip; }}
   body{{ background:var(--bg); color:var(--br); font-family:system-ui,sans-serif; font-size:15px; min-height:100vh; -webkit-font-smoothing:antialiased; margin:0; }}
   .w{{ max-width:1400px; margin:0 auto; padding:10px 24px; }}
   @media(max-width:1440px){{ .w{{ max-width:1280px; padding:10px 18px; }} }}
