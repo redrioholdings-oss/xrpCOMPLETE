@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "171"
+APP_VERSION = "172"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -12470,9 +12470,9 @@ def rg_docket_html():
     return (_rg_head("\u2696\uFE0F", "Enforcement &amp; Litigation Docket", _RG_ORNG,
                      "Matters that shape how XRP may be sold, held and listed. Summaries are "
                      "plain-language and are not legal advice.")
-            + '<table class="rg-tbl"><thead><tr><th>Matter</th><th>Forum</th>'
+            + '<div class="rg-tbl-wrap"><table class="rg-tbl"><thead><tr><th>Matter</th><th>Forum</th>'
               '<th>Posture</th></tr></thead><tbody>'
-            + "".join(rows) + '</tbody></table>'
+            + "".join(rows) + '</tbody></table></div>'
             + _rg_reviewed() + '</div>')
 
 
@@ -13386,12 +13386,12 @@ def render_page(page="main"):
   .sb-sub{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-top:3px; }}
   .sb-bar{{ height:8px; background:var(--s2); border:1px solid var(--b); border-radius:4px; overflow:hidden; margin-top:10px; }}
   .sb-fill{{ height:100%; background:linear-gradient(90deg,var(--rd),var(--yl),var(--gr)); transition:width .4s; }}
-  @media(max-width:900px){{ .sb-grid{{ grid-template-columns:repeat(3,1fr); }} .sb-grid4{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .sb-grid{{ grid-template-columns:repeat(3,1fr); }} .sb-grid4{{ grid-template-columns:repeat(2,1fr); }} }}
 
   /* Global News Feed + right rail */
   .feed-wrap{{ display:grid; grid-template-columns:2fr 1fr; gap:10px; margin:10px 0; align-items:start; }}
   .ledger-wrap{{ display:grid; grid-template-columns:2fr 1fr; gap:10px; margin:10px 0; align-items:stretch; }}
-  @media(max-width:900px){{ .ledger-wrap{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .ledger-wrap{{ grid-template-columns:1fr; }} }}
   .gn-search{{ width:100%; box-sizing:border-box; background:#e9ecf1; border:1px solid #c3c8d1; border-radius:8px;
     color:#1a2a4a; font-family:var(--mn); font-size:15px; padding:12px 14px; margin-bottom:10px; }}
   .gn-search::placeholder{{ color:#6b7280; }}
@@ -13439,7 +13439,7 @@ def render_page(page="main"):
   .rail-row:last-child{{ border-bottom:none; }}
   .rail-k{{ color:var(--tx); }}
   .rail-v{{ font-weight:700; color:var(--br); text-align:right; white-space:nowrap; }}
-  @media(max-width:900px){{ .feed-wrap{{ grid-template-columns:1fr; }}
+  @media(max-width:1080px){{ .feed-wrap{{ grid-template-columns:1fr; }}
                            .rail{{ position:static; max-height:none; overflow:visible; }} }}
 
   /* Analytics Lab */
@@ -13450,7 +13450,7 @@ def render_page(page="main"):
   .bstat:last-child{{ border-bottom:none; }}
   .bk{{ color:var(--tx); }}
   .bv{{ font-weight:700; color:var(--br); text-align:right; }}
-  @media(max-width:900px){{ .lab3{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .lab3{{ grid-template-columns:1fr; }} }}
 
   /* XRP Complete Leaderboard */
   .lb-grid{{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }}
@@ -13469,7 +13469,7 @@ def render_page(page="main"):
   .lb-mini{{ border-top:1px solid var(--b); padding-top:8px; margin-top:4px; }}
   .lb-mini-row{{ display:flex; justify-content:space-between; font-size:15px; font-family:var(--mn); padding:3px 0; }}
   .lb-mini-row span:first-child{{ color:var(--tx); }}
-  @media(max-width:900px){{ .lb-grid{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .lb-grid{{ grid-template-columns:1fr; }} }}
 
   /* XRP Intelligence Brief */
   .brf-head{{ display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px; }}
@@ -13494,7 +13494,7 @@ def render_page(page="main"):
   .brf-t{{ font-size:15px; font-weight:800; font-family:var(--mn); letter-spacing:1px; color:var(--hdr); text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:8px; }}
   .brf-x{{ font-size:15px; color:var(--br); line-height:1.75; font-family:system-ui; }}
   .brf-note{{ font-size:12px; color:var(--tx); font-family:var(--mn); opacity:.7; margin-top:12px; }}
-  @media(max-width:900px){{ .brf-grid{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .brf-grid{{ grid-template-columns:1fr; }} }}
 
   /* Brief Home — designated schedule strip */
   .brf-home{{ background:var(--s2); border:1px solid rgba(255,153,0,.3); border-radius:8px; padding:12px 14px; margin-bottom:14px; }}
@@ -13559,7 +13559,7 @@ def render_page(page="main"):
   .fg-axis{{ display:flex; justify-content:space-between; font-size:12px; color:var(--tx); font-family:var(--mn); margin-top:4px; }}
   .fg-legend{{ display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:12px; font-family:var(--mn); color:var(--tx); }}
   .fg-key{{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:middle; }}
-  @media(max-width:900px){{ .ud-grid{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .ud-grid{{ grid-template-columns:1fr; }} }}
 
   /* Longitudinal Value Markers */
   .lvm-grid{{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }}
@@ -13567,7 +13567,7 @@ def render_page(page="main"):
   .lvm-win{{ font-size:15px; color:var(--tx); font-family:var(--mn); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }}
   .lvm-val{{ font-size:22px; font-weight:900; font-family:var(--mn); line-height:1; }}
   .lvm-sub{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-top:6px; }}
-  @media(max-width:900px){{ .lvm-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .lvm-grid{{ grid-template-columns:repeat(2,1fr); }} }}
 
   /* Regional News Activity Heatmap */
   .rh-grid{{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }}
@@ -13576,7 +13576,7 @@ def render_page(page="main"):
   .rh-name{{ font-size:15px; font-weight:800; color:var(--br); font-family:var(--mn); margin:6px 0; }}
   .rh-num{{ font-size:32px; font-weight:900; font-family:var(--mn); line-height:1; text-shadow:0 0 10px rgba(0,0,0,.55); }}
   .rh-lbl{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-top:5px; }}
-  @media(max-width:900px){{ .rh-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .rh-grid{{ grid-template-columns:repeat(2,1fr); }} }}
 
   /* Sentiment Engine */
   .sent-top{{ display:grid; grid-template-columns:200px 1fr; gap:10px; margin-bottom:14px; }}
@@ -13585,7 +13585,7 @@ def render_page(page="main"):
   .sdt-chart{{ display:flex; align-items:flex-end; gap:2px; height:80px; }}
   .sdt-bar{{ flex:1; min-width:3px; border-radius:2px 2px 0 0; }}
   .sent-bar-mini{{ display:flex; height:8px; border-radius:4px; overflow:hidden; width:80px; background:var(--s2); }}
-  @media(max-width:900px){{ .sent-top{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .sent-top{{ grid-template-columns:1fr; }} }}
 
   /* Competitive Briefing */
   .odl-item, .iso-item{{ background:var(--s2); border:1px solid var(--b); border-radius:6px; padding:9px 12px;
@@ -13597,7 +13597,7 @@ def render_page(page="main"):
   .odl-status.live{{ background:rgba(0,229,204,.15); color:var(--tq); }}
   .odl-note{{ color:var(--tx); font-size:12px; flex:1; min-width:140px; }}
   .sw-grid{{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }}
-  @media(max-width:900px){{ .sw-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .sw-grid{{ grid-template-columns:repeat(2,1fr); }} }}
 
   /* Ripple Executive Tracker + XRPL Dev Activity */
   .ed-grid{{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }}
@@ -13634,7 +13634,7 @@ def render_page(page="main"):
   .gh-msg{{ color:var(--br); text-decoration:none; }}
   .gh-msg:hover{{ color:var(--hdr); text-decoration:underline; }}
   .gh-meta{{ display:block; color:var(--tx); margin-top:2px; }}
-  @media(max-width:900px){{ .ed-grid{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .ed-grid{{ grid-template-columns:1fr; }} }}
 
   /* Regulatory Radar */
   .cg-grid{{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }}
@@ -13650,7 +13650,7 @@ def render_page(page="main"):
   .mica-event{{ font-size:15px; font-weight:700; flex:0 0 190px; }}
   .mica-detail{{ font-size:12px; color:var(--tx); flex:1; font-family:system-ui; line-height:1.5; }}
   @media(max-width:700px){{ .mica-row{{ flex-wrap:wrap; }} .mica-event{{ flex-basis:100%; order:1; }} .mica-detail{{ flex-basis:100%; order:2; }} }}
-  @media(max-width:900px){{ .cg-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .cg-grid{{ grid-template-columns:repeat(2,1fr); }} }}
 
   /* Static Global Partnership Directory (right rail, V90) */
   .sd-panel{{ background:var(--s1); border:1px solid var(--b); border-radius:10px; padding:14px; display:flex; flex-direction:column; }}
@@ -13727,7 +13727,7 @@ def render_page(page="main"):
   .liq-labels{{ display:flex; justify-content:space-between; font-size:15px; font-family:var(--mn); font-weight:700; margin-bottom:6px; }}
   .liq-skew{{ font-size:15px; font-weight:800; color:var(--br); font-family:var(--mn); margin-bottom:4px; }}
   .liq-note{{ font-size:12px; color:var(--tx); font-family:var(--mn); }}
-  @media(max-width:900px){{ .am-grid2{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .am-grid2{{ grid-template-columns:1fr; }} }}
 
   /* CLARITY Act Tracker */
   .ca-list{{ display:flex; flex-direction:column; gap:7px; max-height:520px; overflow-y:auto; }}
@@ -13780,7 +13780,7 @@ def render_page(page="main"):
   .ici-comp-pts{{ font-size:12px; font-weight:800; color:var(--yl); font-family:var(--mn); text-align:right; }}
   .ici-foot{{ margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); font-size:12px;
     color:var(--tx); font-family:var(--mn); line-height:1.6; }}
-  @media(max-width:900px){{ .ici-wrap{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .ici-wrap{{ grid-template-columns:1fr; }} }}
 
   /* Partnership Momentum Chart */
   .pm-panel{{ margin-top:16px; background:var(--s1); border:1px solid var(--b); border-radius:10px; padding:16px; }}
@@ -13859,7 +13859,7 @@ def render_page(page="main"):
   .pt-tbl td:first-child{{ text-align:left; color:var(--br); font-weight:700; }}
   .pt-x{{ cursor:pointer; color:var(--rd); font-weight:900; }}
   .rm-fee-box{{ border-radius:6px; padding:10px; text-align:center; }}
-  @media(max-width:900px){{ .pt-cols{{ grid-template-columns:1fr; }} .fx-grid{{ grid-template-columns:repeat(3,1fr); }} }}
+  @media(max-width:1080px){{ .pt-cols{{ grid-template-columns:1fr; }} .fx-grid{{ grid-template-columns:repeat(3,1fr); }} }}
 
   /* MAIN */
   main{{ max-width:1180px; margin:0 auto; padding:14px 28px 90px; min-height:46vh; }}
@@ -14057,7 +14057,7 @@ def render_page(page="main"):
   .t10-supply-fill{{ height:100%; }}
   .t10-supply-lbl{{ font-size:10.5px; color:var(--tx); margin-top:4px; font-family:var(--mn); }}
   .t10-foot{{ font-size:11px; color:var(--tx); font-style:italic; margin-top:14px; }}
-  @media(max-width:900px){{ .t10-grid-outer{{ grid-template-columns:1fr; }} }}
+  @media(max-width:1080px){{ .t10-grid-outer{{ grid-template-columns:1fr; }} }}
 
   /* ============================================================
      RESPONSIVE SAFETY NET (V107) \u2014 catch-all rules for phones and
@@ -14092,6 +14092,7 @@ def render_page(page="main"):
   .rg-j-n{{ font-weight:800; font-size:14px; color:var(--br); margin-bottom:3px; }}
   .rg-j-s{{ font-family:var(--mn); font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; }}
   .rg-j-d{{ font-size:12px; color:var(--tx); line-height:1.5; margin-top:5px; }}
+  .rg-tbl-wrap{{ overflow-x:auto; -webkit-overflow-scrolling:touch; }}
   .rg-tbl{{ width:100%; border-collapse:collapse; font-size:13px; }}
   .rg-tbl th{{ text-align:left; font-family:var(--mn); font-size:11px; letter-spacing:1px;
                text-transform:uppercase; color:var(--tx); border-bottom:1px solid var(--b); padding:8px 10px; }}
@@ -14154,7 +14155,7 @@ def render_page(page="main"):
   .cmp-flip-rank{{ font-family:var(--mn); font-size:11px; color:var(--tx); }}
   .cmp-flip-v{{ font-size:12.5px; color:var(--br); line-height:1.55; }}
   .cmp-flip-v b{{ color:var(--hdr); }}
-  @media(max-width:900px){{ .cmp-pies{{ grid-template-columns:repeat(3,1fr); }} .cmp-news-grid{{ grid-template-columns:1fr; }} .cmp-flip-grid{{ grid-template-columns:1fr 1fr; }} }}
+  @media(max-width:1080px){{ .cmp-pies{{ grid-template-columns:repeat(3,1fr); }} .cmp-news-grid{{ grid-template-columns:1fr; }} .cmp-flip-grid{{ grid-template-columns:1fr 1fr; }} }}
   @media(max-width:520px){{ .cmp-pies{{ grid-template-columns:repeat(2,1fr); }} .cmp-flip-grid{{ grid-template-columns:1fr; }} }}
   /* Competition page additions (V153) */
   .cmp-mom-dots{{ display:flex; gap:5px; align-items:center; }}
@@ -14174,7 +14175,7 @@ def render_page(page="main"):
   .cmp-score-lbl{{ font-size:12px; color:var(--tx); margin-bottom:4px; }}
   .cmp-score-rank{{ font-family:var(--mn); font-size:22px; font-weight:900; }}
   .cmp-score-of{{ font-size:12px; color:var(--tx); font-weight:400; }}
-  @media(max-width:900px){{ .cmp-h100-grid{{ grid-template-columns:repeat(3,1fr); }} .cmp-score-grid{{ grid-template-columns:repeat(2,1fr); }} }}
+  @media(max-width:1080px){{ .cmp-h100-grid{{ grid-template-columns:repeat(3,1fr); }} .cmp-score-grid{{ grid-template-columns:repeat(2,1fr); }} }}
   @media(max-width:520px){{ .cmp-h100-grid{{ grid-template-columns:repeat(2,1fr); }} .cmp-bar-val{{ width:56px; font-size:11px; }} }}
   /* ---- V121 six-page navigation ---- */
   /* V157 hero header */
@@ -14271,7 +14272,7 @@ def render_page(page="main"):
              font-weight:800; font-size:10.5px; letter-spacing:1.5px; text-decoration:none;
              border-radius:7px; padding:13px 0; line-height:1; white-space:nowrap; }}
   .hc-brief:hover{{ background:#1e9bff; }}
-  @media(max-width:940px){{
+  @media(max-width:1080px){{
     .hero{{ flex-direction:column; align-items:stretch; min-height:0; }}
     .hero-art{{ width:100%; opacity:.28; }}
     .hero-fade{{ background:linear-gradient(180deg,rgba(2,4,10,.6),rgba(2,4,10,.85)); }}
