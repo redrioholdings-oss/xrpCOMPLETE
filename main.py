@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "172"
+APP_VERSION = "173"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -14288,6 +14288,8 @@ def render_page(page="main"):
   .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
          border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
          padding:13px 0; }}
+  /* V173: duplicate nav above footer — identical bar, but never sticky */
+  .xnav.xnav-bottom{{ position:static; z-index:1; }}
   .xnav-in{{ max-width:1280px; margin:0 auto; padding:0 10px;
             display:flex; justify-content:center; flex-wrap:wrap; gap:30px; }}
   /* V154 icons / V159: bar 35% taller, white page titles under icons, 30px gaps */
@@ -14354,6 +14356,8 @@ def render_page(page="main"):
         + (' target="_blank" rel="noopener"' if k == "blog" else '')
         + f'>{_ic[k]}<span class="nv-t">{t}</span></a>'
         for k, h, t in _pages) + '</div></nav>')
+    # V173: working copy of the nav for the bottom of every page (non-sticky variant)
+    _nav_bottom = _nav.replace('<nav class="xnav">', '<nav class="xnav xnav-bottom">', 1)
 
     _chrome = f"""<body id="top">
 
@@ -16100,6 +16104,9 @@ document.addEventListener('DOMContentLoaded', function() {{
 
   <!-- FLOATING RETURN / BACK-TO-TOP -->
   <button id="back-to-top" title="Return to XRP Complete" aria-label="Return to XRP Complete">&#8679;</button>
+
+  <!-- BOTTOM NAVIGATION (V173: duplicate of main nav so readers can keep browsing) -->
+{_nav_bottom}
 
   <!-- FOOTER -->
   <footer>
