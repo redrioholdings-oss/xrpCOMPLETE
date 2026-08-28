@@ -192,7 +192,7 @@ except Exception:
     CENTRAL = timezone(timedelta(hours=-6))  # CST fallback
 
 import requests
-from flask import Flask, Response, jsonify, abort
+from flask import Flask, Response, jsonify, abort, request
 
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -9494,177 +9494,388 @@ def _track_catalyst_clock(pool):
         _CATALYST_TOTAL += 1
 
 
-# ── Global XRP Enterprise & Partnership Ledger ──
+# ── XRP Global Partnership Bridge — persistent, ever-growing archive ──
+# Backed by SQLite so entries survive Railway redeploys (mount a Volume at
+# PARTNERSHIP_DB_PATH). Seeded once from the 199-entry curated master list
+# below; every deal auto-detected from the live news feed afterward is
+# inserted permanently alongside it. Nothing is ever deleted or overwritten.
 
-# ── Static Global Partnership Directory (right rail) — refreshed every 3 days ──
-# PLACEHOLDER data structure. Rich will supply the real 100+ entry list; this proves the mechanism.
-STATIC_PARTNER_DIRECTORY = {"entries": [], "last_refreshed": None}
-STATIC_PARTNER_REFRESH_DAYS = 3
+MASTER_PARTNERSHIPS = [
+    {"num": 1, "key": "seed:1:american express", "name": "American Express", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets American Express settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 2, "key": "seed:2:standard chartered", "name": "Standard Chartered", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Standard Chartered customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 3, "key": "seed:3:bank of america merrill lynch", "name": "Bank of America Merrill Lynch", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Bank of America Merrill Lynch's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 4, "key": "seed:4:pnc financial services", "name": "PNC Financial Services", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets PNC Financial Services settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 5, "key": "seed:5:cuallix", "name": "Cuallix", "flag": "🇲🇽", "country": "Mexico", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "XRP", "benefit": "Extends Cuallix's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 6, "key": "seed:6:catalyst corporate federal credit union", "name": "Catalyst Corporate Federal Credit Union", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Catalyst Corporate Federal Credit Union's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 7, "key": "seed:7:star one credit union", "name": "Star One Credit Union", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Star One Credit Union's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 8, "key": "seed:8:cbw bank", "name": "CBW Bank", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends CBW Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 9, "key": "seed:9:cross river bank", "name": "Cross River Bank", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Cross River Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 10, "key": "seed:10:royal bank of canada", "name": "Royal Bank of Canada", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Royal Bank of Canada customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 11, "key": "seed:11:dh corporation", "name": "DH Corporation", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives DH Corporation customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 12, "key": "seed:12:canadian imperial bank of commerce", "name": "Canadian Imperial Bank of Commerce", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Canadian Imperial Bank of Commerce customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 13, "key": "seed:13:scotiabank", "name": "Scotiabank", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Scotiabank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 14, "key": "seed:14:bank of montreal", "name": "Bank of Montreal", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Bank of Montreal customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 15, "key": "seed:15:atb financial", "name": "ATB Financial", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends ATB Financial's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 16, "key": "seed:16:td bank canada", "name": "TD Bank Canada", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends TD Bank Canada's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 17, "key": "seed:17:saldo", "name": "Saldo", "flag": "🇫🇮", "country": "Finland", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Saldo's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 18, "key": "seed:18:interbank", "name": "Interbank", "flag": "🇵🇪", "country": "Peru", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "XRP", "benefit": "Gives Interbank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 19, "key": "seed:19:euro exim bank", "name": "Euro Exim Bank", "flag": "🇱🇨", "country": "Saint Lucia", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "XRP", "benefit": "Lets Euro Exim Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 20, "key": "seed:20:bank of england", "name": "Bank of England", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Bank of England's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 21, "key": "seed:21:hsbc", "name": "HSBC", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets HSBC settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 22, "key": "seed:22:barclays", "name": "Barclays", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Barclays's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 23, "key": "seed:23:vitesse", "name": "Vitesse", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Vitesse customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 24, "key": "seed:24:royal bank of scotland", "name": "Royal Bank of Scotland", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Royal Bank of Scotland's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 25, "key": "seed:25:credit agricole", "name": "Credit Agricole", "flag": "🇫🇷", "country": "France", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Credit Agricole's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 26, "key": "seed:26:natixis", "name": "Natixis", "flag": "🇫🇷", "country": "France", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Natixis's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 27, "key": "seed:27:banco santander", "name": "Banco Santander", "flag": "🇪🇸", "country": "Spain", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Banco Santander's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 28, "key": "seed:28:bbva", "name": "BBVA", "flag": "🇪🇸", "country": "Spain", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends BBVA's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 29, "key": "seed:29:intesa sanpaolo", "name": "Intesa Sanpaolo", "flag": "🇮🇹", "country": "Italy", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Intesa Sanpaolo's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 30, "key": "seed:30:unicredit", "name": "UniCredit", "flag": "🇮🇹", "country": "Italy", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets UniCredit settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 31, "key": "seed:31:reisebank", "name": "ReiseBank", "flag": "🇩🇪", "country": "Germany", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets ReiseBank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 32, "key": "seed:32:fidor bank", "name": "Fidor Bank", "flag": "🇩🇪", "country": "Germany", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Fidor Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 33, "key": "seed:33:rabobank", "name": "Rabobank", "flag": "🇳🇱", "country": "Netherlands", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Rabobank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 34, "key": "seed:34:erste group ag", "name": "Erste Group AG", "flag": "🇦🇹", "country": "Austria", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Erste Group AG's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 35, "key": "seed:35:ubs", "name": "UBS", "flag": "🇨🇭", "country": "Switzerland", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets UBS settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 36, "key": "seed:36:credit suisse", "name": "Credit Suisse", "flag": "🇨🇭", "country": "Switzerland", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Credit Suisse customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 37, "key": "seed:37:nordea", "name": "Nordea", "flag": "🇸🇪", "country": "Sweden", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Nordea settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 38, "key": "seed:38:seb", "name": "SEB", "flag": "🇸🇪", "country": "Sweden", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets SEB settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 39, "key": "seed:39:akbank", "name": "Akbank", "flag": "🇹🇷", "country": "Türkiye", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Akbank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 40, "key": "seed:40:bank leumi", "name": "Bank Leumi", "flag": "🇮🇱", "country": "Israel", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Bank Leumi customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 41, "key": "seed:41:national bank of kuwait", "name": "National Bank of Kuwait", "flag": "🇰🇼", "country": "Kuwait", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends National Bank of Kuwait's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 42, "key": "seed:42:kuwait finance house", "name": "Kuwait Finance House", "flag": "🇰🇼", "country": "Kuwait", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Kuwait Finance House's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 43, "key": "seed:43:bank dhofar", "name": "Bank Dhofar", "flag": "🇴🇲", "country": "Oman", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Bank Dhofar customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 44, "key": "seed:44:saudi arabian monetary authority", "name": "Saudi Arabian Monetary Authority", "flag": "🇸🇦", "country": "Saudi Arabia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Saudi Arabian Monetary Authority settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 45, "key": "seed:45:first abu dhabi bank", "name": "First Abu Dhabi Bank", "flag": "🇦🇪", "country": "United Arab Emirates", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets First Abu Dhabi Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 46, "key": "seed:46:rakbank", "name": "RAKBANK", "flag": "🇦🇪", "country": "United Arab Emirates", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends RAKBANK's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 47, "key": "seed:47:al rajhi bank", "name": "Al Rajhi Bank", "flag": "🇸🇦", "country": "Saudi Arabia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Al Rajhi Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 48, "key": "seed:48:dbs group", "name": "DBS Group", "flag": "🇸🇬", "country": "Singapore", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets DBS Group settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 49, "key": "seed:49:ocbc bank", "name": "OCBC Bank", "flag": "🇸🇬", "country": "Singapore", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives OCBC Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 50, "key": "seed:50:united overseas bank", "name": "United Overseas Bank", "flag": "🇸🇬", "country": "Singapore", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives United Overseas Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 51, "key": "seed:51:singapore exchange", "name": "Singapore Exchange", "flag": "🇸🇬", "country": "Singapore", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Singapore Exchange's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 52, "key": "seed:52:krungsri", "name": "Krungsri", "flag": "🇹🇭", "country": "Thailand", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Krungsri customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 53, "key": "seed:53:bank of thailand", "name": "Bank of Thailand", "flag": "🇹🇭", "country": "Thailand", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Bank of Thailand's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 54, "key": "seed:54:bank indonesia", "name": "Bank Indonesia", "flag": "🇮🇩", "country": "Indonesia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Bank Indonesia settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 55, "key": "seed:55:siam commercial bank", "name": "Siam Commercial Bank", "flag": "🇹🇭", "country": "Thailand", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Siam Commercial Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 56, "key": "seed:56:cargills bank", "name": "Cargills Bank", "flag": "🇱🇰", "country": "Sri Lanka", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Cargills Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 57, "key": "seed:57:kotak mahindra bank", "name": "Kotak Mahindra Bank", "flag": "🇮🇳", "country": "India", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Kotak Mahindra Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 58, "key": "seed:58:indusind bank", "name": "IndusInd Bank", "flag": "🇮🇳", "country": "India", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives IndusInd Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 59, "key": "seed:59:axis bank", "name": "Axis Bank", "flag": "🇮🇳", "country": "India", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Axis Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 60, "key": "seed:60:yes bank", "name": "YES Bank", "flag": "🇮🇳", "country": "India", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets YES Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 61, "key": "seed:61:faysal bank", "name": "Faysal Bank", "flag": "🇵🇰", "country": "Pakistan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Faysal Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 62, "key": "seed:62:shanghai huarui bank", "name": "Shanghai Huarui Bank", "flag": "🇨🇳", "country": "China", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Shanghai Huarui Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 63, "key": "seed:63:woori bank", "name": "Woori Bank", "flag": "🇰🇷", "country": "South Korea", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Woori Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 64, "key": "seed:64:sbi holdings", "name": "SBI Holdings", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends SBI Holdings's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 65, "key": "seed:65:mitsubishi ufj financial group", "name": "Mitsubishi UFJ Financial Group", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Mitsubishi UFJ Financial Group customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 66, "key": "seed:66:fukui bank", "name": "Fukui Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Fukui Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 67, "key": "seed:67:star bank (japan)", "name": "Star Bank (Japan)", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Star Bank (Japan) settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 68, "key": "seed:68:aomori bank", "name": "Aomori Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Aomori Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 69, "key": "seed:69:ashikaga bank", "name": "Ashikaga Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Ashikaga Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 70, "key": "seed:70:awa bank", "name": "Awa Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Awa Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 71, "key": "seed:71:aeon bank", "name": "AEON Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends AEON Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 72, "key": "seed:72:senshu ikeda bank", "name": "Senshu Ikeda Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Senshu Ikeda Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 73, "key": "seed:73:iyo bank", "name": "Iyo Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Iyo Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 74, "key": "seed:74:oita bank", "name": "Oita Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Oita Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 75, "key": "seed:75:orix bank", "name": "Orix Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Orix Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 76, "key": "seed:76:gumma bank", "name": "Gumma Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Gumma Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 77, "key": "seed:77:keiyo bank", "name": "Keiyo Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Keiyo Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 78, "key": "seed:78:san-in godo bank", "name": "San-In Godo Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets San-In Godo Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 79, "key": "seed:79:shikoku bank", "name": "Shikoku Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Shikoku Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 80, "key": "seed:80:77 bank", "name": "77 Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets 77 Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 81, "key": "seed:81:shimizu bank", "name": "Shimizu Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Shimizu Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 82, "key": "seed:82:juroku bank", "name": "Juroku Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Juroku Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 83, "key": "seed:83:shinkin central bank", "name": "Shinkin Central Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Shinkin Central Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 84, "key": "seed:84:shinsei bank", "name": "Shinsei Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Shinsei Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 85, "key": "seed:85:hachijuni bank", "name": "Hachijuni Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Hachijuni Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 86, "key": "seed:86:michinoku bank", "name": "Michinoku Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Michinoku Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 87, "key": "seed:87:mizuho financial group", "name": "Mizuho Financial Group", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Mizuho Financial Group settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 88, "key": "seed:88:musashino bank", "name": "Musashino Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Musashino Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 89, "key": "seed:89:nomura trust and banking", "name": "Nomura Trust and Banking", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Nomura Trust and Banking customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 90, "key": "seed:90:seven bank", "name": "Seven Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Seven Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 91, "key": "seed:91:sony bank", "name": "Sony Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Sony Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 92, "key": "seed:92:yachiyo bank", "name": "Yachiyo Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Yachiyo Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 93, "key": "seed:93:tochigi bank", "name": "Tochigi Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Tochigi Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 94, "key": "seed:94:bank of the ryukyus", "name": "Bank of the Ryukyus", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Bank of the Ryukyus's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 95, "key": "seed:95:chiba bank", "name": "Chiba Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Chiba Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 96, "key": "seed:96:chugoku bank", "name": "Chugoku Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Chugoku Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 97, "key": "seed:97:daishi bank", "name": "Daishi Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Daishi Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 98, "key": "seed:98:daiwa next bank", "name": "Daiwa Next Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Daiwa Next Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 99, "key": "seed:99:hiroshima bank", "name": "Hiroshima Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Hiroshima Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 100, "key": "seed:100:hyakugo bank", "name": "Hyakugo Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Hyakugo Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 101, "key": "seed:101:suruga bank", "name": "Suruga Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Suruga Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 102, "key": "seed:102:yamaguchi bank", "name": "Yamaguchi Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Yamaguchi Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 103, "key": "seed:103:hokuriku bank", "name": "Hokuriku Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Hokuriku Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 104, "key": "seed:104:nishi-nippon city bank", "name": "Nishi-Nippon City Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Nishi-Nippon City Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 105, "key": "seed:105:north pacific bank", "name": "North Pacific Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends North Pacific Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 106, "key": "seed:106:resona bank", "name": "Resona Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Resona Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 107, "key": "seed:107:sumitomo mitsui trust bank", "name": "Sumitomo Mitsui Trust Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Sumitomo Mitsui Trust Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 108, "key": "seed:108:toho bank", "name": "Toho Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Toho Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 109, "key": "seed:109:tsukuba bank", "name": "Tsukuba Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Tsukuba Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 110, "key": "seed:110:yamagata bank", "name": "Yamagata Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends Yamagata Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 111, "key": "seed:111:bank of yokohama", "name": "Bank of Yokohama", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Bank of Yokohama settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 112, "key": "seed:112:sbi sumishin net bank", "name": "SBI Sumishin Net Bank", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Extends SBI Sumishin Net Bank's payments infrastructure with a digital-asset settlement option, reducing reliance on pre-funded nostro accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 113, "key": "seed:113:anz", "name": "ANZ", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets ANZ settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 114, "key": "seed:114:westpac", "name": "Westpac", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Westpac customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 115, "key": "seed:115:commonwealth bank of australia", "name": "Commonwealth Bank of Australia", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Commonwealth Bank of Australia settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 116, "key": "seed:116:macquarie group", "name": "Macquarie Group", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Lets Macquarie Group settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 117, "key": "seed:117:national australia bank", "name": "National Australia Bank", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "BANK / FINANCIAL INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives National Australia Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 118, "key": "seed:118:american express fx international payments", "name": "American Express FX International Payments", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Lowers the cost and wait time of cross-border remittances processed through American Express FX International Payments, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 119, "key": "seed:119:instarem", "name": "InstaReM", "flag": "🇸🇬", "country": "Singapore", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for InstaReM's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 120, "key": "seed:120:sendfriend", "name": "SendFriend", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Speeds up remittance delivery for SendFriend's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 121, "key": "seed:121:beetech", "name": "BeeTech", "flag": "🇧🇷", "country": "Brazil", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for BeeTech's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 122, "key": "seed:122:viamericas", "name": "Viamericas", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Lowers the cost and wait time of cross-border remittances processed through Viamericas, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 123, "key": "seed:123:transpaygo", "name": "Transpaygo", "flag": "🇦🇹", "country": "Austria", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Lowers the cost and wait time of cross-border remittances processed through Transpaygo, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 124, "key": "seed:124:unipay", "name": "UniPAY", "flag": "🌐", "country": "🌐  Origin unclear / global", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Lowers the cost and wait time of cross-border remittances processed through UniPAY, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 125, "key": "seed:125:moneygram", "name": "MoneyGram", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Lowers the cost and wait time of cross-border remittances processed through MoneyGram, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 126, "key": "seed:126:zip remit", "name": "Zip Remit", "flag": "🌐", "country": "🌐  Origin unclear / global", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for Zip Remit's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 127, "key": "seed:127:itaú unibanco", "name": "Itaú Unibanco", "flag": "🇧🇷", "country": "Brazil", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for Itaú Unibanco's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 128, "key": "seed:128:western union", "name": "Western Union", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Lowers the cost and wait time of cross-border remittances processed through Western Union, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 129, "key": "seed:129:uae exchange", "name": "UAE Exchange", "flag": "🇦🇪", "country": "United Arab Emirates", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Lowers the cost and wait time of cross-border remittances processed through UAE Exchange, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 130, "key": "seed:130:transfergo", "name": "TransferGo", "flag": "🇱🇹", "country": "Lithuania", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for TransferGo's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 131, "key": "seed:131:sbi remit", "name": "SBI Remit", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Lowers the cost and wait time of cross-border remittances processed through SBI Remit, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 132, "key": "seed:132:flashfx", "name": "FlashFX", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "XRP", "benefit": "Lowers the cost and wait time of cross-border remittances processed through FlashFX, a meaningful upgrade for recipients abroad. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 133, "key": "seed:133:earthport", "name": "Earthport", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "REMITTANCE / MONEY TRANSFER", "xcat": "RIPPLE", "benefit": "Speeds up remittance delivery for Earthport's customers, who often depend on fast, low-cost transfers for everyday needs. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 134, "key": "seed:134:currencies direct", "name": "Currencies Direct", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Gives Currencies Direct a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 135, "key": "seed:135:fairfx", "name": "FairFX", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Gives FairFX a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 136, "key": "seed:136:rationalfx", "name": "RationalFX", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for RationalFX's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 137, "key": "seed:137:exchange4free", "name": "Exchange4Free", "flag": "🇿🇦", "country": "South Africa", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for Exchange4Free's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 138, "key": "seed:138:bexs banco", "name": "Bexs Banco", "flag": "🇧🇷", "country": "Brazil", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Gives Bexs Banco a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 139, "key": "seed:139:ezforex", "name": "eZforex", "flag": "🌐", "country": "🌐  Origin unclear / global", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "FX / PAYMENTS", "xcat": "RIPPLE", "benefit": "Gives eZforex a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 140, "key": "seed:140:flashfx", "name": "FlashFX", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "FX / PAYMENTS", "xcat": "XRP", "benefit": "Gives FlashFX a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 141, "key": "seed:141:coinone", "name": "Coinone", "flag": "🇰🇷", "country": "South Korea", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "CRYPTO EXCHANGE", "xcat": "RIPPLE", "benefit": "Gives Coinone users direct access to a regulated venue for trading or holding the asset, widening retail and institutional reach. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 142, "key": "seed:142:sbi vc trade", "name": "SBI VC Trade", "flag": "🇯🇵", "country": "Japan", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "CRYPTO EXCHANGE", "xcat": "RIPPLE", "benefit": "Gives SBI VC Trade users direct access to a regulated venue for trading or holding the asset, widening retail and institutional reach. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 143, "key": "seed:143:mercury fx", "name": "Mercury FX", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives Mercury FX a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 144, "key": "seed:144:cambridge global payments", "name": "Cambridge Global Payments", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives Cambridge Global Payments a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 145, "key": "seed:145:finastra", "name": "Finastra", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for Finastra's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 146, "key": "seed:146:davis + henderson (d+h)", "name": "Davis + Henderson (D+H)", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives Davis + Henderson (D+H) a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 147, "key": "seed:147:finablr", "name": "Finablr", "flag": "🇦🇪", "country": "United Arab Emirates", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives Finablr a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 148, "key": "seed:148:lianlian pay", "name": "LianLian Pay", "flag": "🇨🇳", "country": "China", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives LianLian Pay a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 149, "key": "seed:149:idt", "name": "IDT", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives IDT a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 150, "key": "seed:150:golance", "name": "goLance", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship; direct XRP/ODL/xRapid evidence", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "PAYMENTS / FINTECH", "xcat": "XRP", "benefit": "Gives goLance a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 151, "key": "seed:151:airwallex", "name": "Airwallex", "flag": "🇦🇺", "country": "Australia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for Airwallex's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 152, "key": "seed:152:dlocal", "name": "dLocal", "flag": "🇺🇾", "country": "Uruguay", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Primary", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for dLocal's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 153, "key": "seed:153:tas group", "name": "TAS Group", "flag": "🇮🇹", "country": "Italy", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "PAYMENTS / FINTECH", "xcat": "RIPPLE", "benefit": "Gives TAS Group a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 154, "key": "seed:154:moneymatch", "name": "MoneyMatch", "flag": "🇲🇾", "country": "Malaysia", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends MoneyMatch's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 155, "key": "seed:155:volante technologies", "name": "Volante Technologies", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends Volante Technologies's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 156, "key": "seed:156:expertus", "name": "Expertus", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends Expertus's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 157, "key": "seed:157:temenos", "name": "Temenos", "flag": "🇨🇭", "country": "Switzerland", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends Temenos's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 158, "key": "seed:158:cgi group", "name": "CGI Group", "flag": "🇨🇦", "country": "Canada", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends CGI Group's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 159, "key": "seed:159:yantra financial technologies", "name": "Yantra Financial Technologies", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "SOFTWARE / TECHNOLOGY", "xcat": "RIPPLE", "benefit": "Extends Yantra Financial Technologies's platform with faster, programmable settlement rails for its enterprise and institutional customers. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 160, "key": "seed:160:deloitte", "name": "Deloitte", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into Deloitte's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 161, "key": "seed:161:accenture", "name": "Accenture", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into Accenture's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 162, "key": "seed:162:arrington xrp capital", "name": "Arrington XRP Capital", "flag": "🇺🇸", "country": "United States", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into Arrington XRP Capital's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 163, "key": "seed:163:wemakeprice", "name": "WeMakePrice", "flag": "🇰🇷", "country": "South Korea", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into WeMakePrice's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 164, "key": "seed:164:selly", "name": "Selly", "flag": "🇰🇷", "country": "South Korea", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Extends the network's institutional footprint through Selly, strengthening the case for mainstream, real-world usage. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 165, "key": "seed:165:asia mtm group", "name": "Asia MTM Group", "flag": "🌐", "country": "🌐  Asia-Pacific", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into Asia MTM Group's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 166, "key": "seed:166:bichip", "name": "Bichip", "flag": "🌐", "country": "🌐  Origin unclear / global", "relationship": "RippleNet / Ripple enterprise relationship", "status": "Historical / status needs current re-verification", "date_str": "≤2019", "evidence": "Secondary compilation", "industry": "OTHER / STRATEGIC", "xcat": "RIPPLE", "benefit": "Deepens the ecosystem's reach into Bichip's market, adding one more regulated bridge between traditional finance and digital assets. Note: this reflects an earlier-stage relationship that may need re-verification for current status."},
+    {"num": 167, "key": "seed:167:bdacs", "name": "BDACS", "flag": "🇰🇷", "country": "South Korea", "relationship": "Ripple Custody; XRP/RLUSD custody", "status": "Live/announced", "date_str": "2025-02-26", "evidence": "Primary", "industry": "INSTITUTIONAL CUSTODY", "xcat": "XRP", "benefit": "Strengthens BDACS's institutional-grade custody offering, making it easier for banks and funds to safely hold tokenized assets. This relationship is live today."},
+    {"num": 168, "key": "seed:168:bny", "name": "BNY", "flag": "🇺🇸", "country": "United States", "relationship": "Primary custodian for RLUSD reserves", "status": "Live", "date_str": "2025-07-09", "evidence": "Primary", "industry": "CUSTODIAN BANK", "xcat": "RIPPLE", "benefit": "Strengthens BNY's institutional-grade custody offering, making it easier for banks and funds to safely hold tokenized assets. This relationship is live today."},
+    {"num": 169, "key": "seed:169:ctrl alt", "name": "Ctrl Alt", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "Ripple Custody for Dubai Land Department tokenized deeds on XRPL", "status": "Live/announced", "date_str": "2025-07-16", "evidence": "Primary", "industry": "TOKENIZATION INFRASTRUCTURE", "xcat": "XRPL", "benefit": "Brings real-world assets onto a public ledger through Ctrl Alt, improving transparency and settlement speed for investors. This relationship is live today."},
+    {"num": 170, "key": "seed:170:dubai land department", "name": "Dubai Land Department", "flag": "🇦🇪", "country": "United Arab Emirates", "relationship": "Real-estate title deed tokenization on XRPL via Ctrl Alt", "status": "Live/announced", "date_str": "2025-07-16", "evidence": "Primary", "industry": "GOVERNMENT / LAND REGISTRY", "xcat": "XRPL", "benefit": "Gives Dubai Land Department a transparent, tamper-resistant digital record for public assets, cutting paperwork and processing time for citizens. This relationship is live today."},
+    {"num": 171, "key": "seed:171:circle", "name": "Circle", "flag": "🇺🇸", "country": "United States", "relationship": "USDC launched on XRPL", "status": "Live", "date_str": "2025-06-12", "evidence": "Primary", "industry": "STABLECOIN ISSUER", "xcat": "XRPL", "benefit": "Adds a stable, regulated settlement asset to Circle's toolkit, useful for treasury and cross-border payment use cases. This relationship is live today."},
+    {"num": 172, "key": "seed:172:openpayd", "name": "OpenPayd", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "Ripple Payments + RLUSD mint/burn infrastructure", "status": "Live/announced", "date_str": "2025-07-02", "evidence": "Primary", "industry": "PAYMENTS INFRASTRUCTURE", "xcat": "RIPPLE", "benefit": "Gives OpenPayd the infrastructure to plug digital-asset settlement into its existing products without building it from scratch. This relationship is live today."},
+    {"num": 173, "key": "seed:173:absa bank", "name": "Absa Bank", "flag": "🇿🇦", "country": "South Africa", "relationship": "Ripple Custody", "status": "Live/announced", "date_str": "2025-10-15", "evidence": "Primary", "industry": "BANK", "xcat": "RIPPLE", "benefit": "Gives Absa Bank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. This relationship is live today."},
+    {"num": 174, "key": "seed:174:bbva spain", "name": "BBVA Spain", "flag": "🇪🇸", "country": "Spain", "relationship": "Ripple Custody for crypto trading/custody", "status": "Live/announced", "date_str": "2025-09-09", "evidence": "Primary", "industry": "BANK", "xcat": "RIPPLE", "benefit": "Gives BBVA Spain customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. This relationship is live today."},
+    {"num": 175, "key": "seed:175:mastercard", "name": "Mastercard", "flag": "🌐", "country": "🌐  Global", "relationship": "RLUSD settlement pilot on XRPL with WebBank/Gemini", "status": "Pilot/announced", "date_str": "2025-11-05", "evidence": "Primary", "industry": "PAYMENT NETWORK", "xcat": "XRPL", "benefit": "Gives Mastercard a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. It's currently in pilot, with production use still ahead."},
+    {"num": 176, "key": "seed:176:webbank", "name": "WebBank", "flag": "🇺🇸", "country": "United States", "relationship": "RLUSD settlement pilot on XRPL for Gemini Credit Card", "status": "Pilot/announced", "date_str": "2025-11-05", "evidence": "Primary", "industry": "BANK", "xcat": "XRPL", "benefit": "Lets WebBank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. It's currently in pilot, with production use still ahead."},
+    {"num": 177, "key": "seed:177:gemini", "name": "Gemini", "flag": "🇺🇸", "country": "United States", "relationship": "RLUSD settlement pilot on XRPL", "status": "Pilot/announced", "date_str": "2025-11-05", "evidence": "Primary", "industry": "CRYPTO EXCHANGE / CARD", "xcat": "XRPL", "benefit": "Gives Gemini users direct access to a regulated venue for trading or holding the asset, widening retail and institutional reach. It's currently in pilot, with production use still ahead."},
+    {"num": 178, "key": "seed:178:amina bank", "name": "AMINA Bank", "flag": "🇨🇭", "country": "Switzerland", "relationship": "Ripple Payments", "status": "Live", "date_str": "2025-12-12", "evidence": "Primary", "industry": "BANK", "xcat": "RIPPLE", "benefit": "Lets AMINA Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. This relationship is live today."},
+    {"num": 179, "key": "seed:179:redotpay", "name": "RedotPay", "flag": "🇭🇰", "country": "Hong Kong", "relationship": "Ripple Payments; XRP/stablecoin to NGN flows", "status": "Live", "date_str": "2025-12-02", "evidence": "Primary", "industry": "PAYMENTS FINTECH", "xcat": "XRP", "benefit": "Cuts settlement time and cost for RedotPay's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. This relationship is live today."},
+    {"num": 180, "key": "seed:180:kbank", "name": "Kbank", "flag": "🇰🇷", "country": "South Korea", "relationship": "Ripple Custody wallet-as-a-service", "status": "Live/announced", "date_str": "2026-04-30", "evidence": "Primary", "industry": "BANK", "xcat": "RIPPLE", "benefit": "Gives Kbank customers a regulated on-ramp to move value across borders faster and cheaper than legacy correspondent banking. This relationship is live today."},
+    {"num": 181, "key": "seed:181:jeonbuk bank", "name": "Jeonbuk Bank", "flag": "🇰🇷", "country": "South Korea", "relationship": "Ripple Payments for cross-border remittances", "status": "Live", "date_str": "2026-08-18", "evidence": "Primary", "industry": "BANK", "xcat": "RIPPLE", "benefit": "Lets Jeonbuk Bank settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. This relationship is live today."},
+    {"num": 182, "key": "seed:182:zilo", "name": "ZILO", "flag": "🇬🇧", "country": "United Kingdom", "relationship": "Strategic investment and XRPL-linked transfer agency infrastructure", "status": "Announced", "date_str": "2026-08-03", "evidence": "Primary", "industry": "TRANSFER AGENCY / CAPITAL MARKETS", "xcat": "XRPL", "benefit": "Gives ZILO a faster settlement layer for capital-markets transactions that traditionally take days to clear. It has been announced, with rollout details developing."},
+    {"num": 183, "key": "seed:183:licuido", "name": "Licuido", "flag": "🇧🇷", "country": "Brazil", "relationship": "Strategic investment and XRPL-linked issuance/collateral mobility", "status": "Announced", "date_str": "2026-08-03", "evidence": "Primary", "industry": "TOKENIZATION / TRADING", "xcat": "XRPL", "benefit": "Lets Licuido issue or transfer tokenized assets with faster settlement and a fully auditable on-chain record. It has been announced, with rollout details developing."},
+    {"num": 184, "key": "seed:184:bilira", "name": "BiLira", "flag": "🇹🇷", "country": "Türkiye", "relationship": "RLUSD distribution/access", "status": "Live", "date_str": "2026-06-02", "evidence": "Primary", "industry": "STABLECOIN / CRYPTO INFRASTRUCTURE", "xcat": "RIPPLE", "benefit": "Adds a stable, regulated settlement asset to BiLira's toolkit, useful for treasury and cross-border payment use cases. This relationship is live today."},
+    {"num": 185, "key": "seed:185:bitexen", "name": "Bitexen", "flag": "🇹🇷", "country": "Türkiye", "relationship": "RLUSD distribution/access", "status": "Live", "date_str": "2026-06-02", "evidence": "Primary", "industry": "CRYPTO EXCHANGE", "xcat": "RIPPLE", "benefit": "Gives Bitexen users direct access to a regulated venue for trading or holding the asset, widening retail and institutional reach. This relationship is live today."},
+    {"num": 186, "key": "seed:186:bitlo", "name": "Bitlo", "flag": "🇹🇷", "country": "Türkiye", "relationship": "RLUSD distribution/access", "status": "Live", "date_str": "2026-06-02", "evidence": "Primary", "industry": "CRYPTO EXCHANGE", "xcat": "RIPPLE", "benefit": "Expands where Bitlo's customers can access the ecosystem, adding liquidity and legitimacy to the broader market. This relationship is live today."},
+    {"num": 187, "key": "seed:187:bitso", "name": "Bitso", "flag": "🇲🇽", "country": "Mexico", "relationship": "Expanded payments partnership; MXNB on XRPL", "status": "Live/expanded", "date_str": "2026-06-11", "evidence": "Primary", "industry": "CRYPTO EXCHANGE / PAYMENTS", "xcat": "XRPL", "benefit": "Expands where Bitso's customers can access the ecosystem, adding liquidity and legitimacy to the broader market. This relationship is live today."},
+    {"num": 188, "key": "seed:188:braza bank", "name": "Braza Bank", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple Payments; BBRL stablecoin on XRPL", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "BANK / FX", "xcat": "XRPL", "benefit": "Cuts settlement time and cost for Braza Bank's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. This relationship is live today."},
+    {"num": 189, "key": "seed:189:nomad", "name": "Nomad", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple Payments and liquidity network; RLUSD settlement option", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "FINTECH", "xcat": "RIPPLE", "benefit": "Extends Nomad's platform with faster, programmable settlement rails for its enterprise and institutional customers. This relationship is live today."},
+    {"num": 190, "key": "seed:190:azify", "name": "Azify", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple Payments for stablecoin-to-fiat exchange", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "FINTECH", "xcat": "RIPPLE", "benefit": "Extends Azify's platform with faster, programmable settlement rails for its enterprise and institutional customers. This relationship is live today."},
+    {"num": 191, "key": "seed:191:attrus", "name": "ATTRUS", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple cross-border payments; RLUSD settlement framework", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "PAYMENTS / OTC", "xcat": "RIPPLE", "benefit": "Cuts settlement time and cost for ATTRUS's international transfers by routing them through on-demand digital liquidity instead of pre-funded accounts. This relationship is live today."},
+    {"num": 192, "key": "seed:192:frente corretora", "name": "Frente Corretora", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple platform for cross-border operations/stablecoin collections", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "FX INSTITUTION", "xcat": "RIPPLE", "benefit": "Gives Frente Corretora a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. This relationship is live today."},
+    {"num": 193, "key": "seed:193:crx", "name": "CRX", "flag": "🇧🇷", "country": "Brazil", "relationship": "XRPL + Ripple Custody for tokenized assets", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "TOKENIZATION INFRASTRUCTURE", "xcat": "XRPL", "benefit": "Brings real-world assets onto a public ledger through CRX, improving transparency and settlement speed for investors. This relationship is live today."},
+    {"num": 194, "key": "seed:194:justoken", "name": "Justoken", "flag": "🇧🇷", "country": "Brazil", "relationship": "XRPL tokenization + Ripple Custody", "status": "Live", "date_str": "2026-03-17", "evidence": "Primary", "industry": "RWA TOKENIZATION", "xcat": "XRPL", "benefit": "Lets Justoken issue or transfer tokenized assets with faster settlement and a fully auditable on-chain record. This relationship is live today."},
+    {"num": 195, "key": "seed:195:alfred", "name": "alfred", "flag": "🌐", "country": "🌐  Americas / global", "relationship": "Ripple Payments for stablecoin-to-fiat flows", "status": "Live", "date_str": "2026-03-03", "evidence": "Primary", "industry": "FINTECH", "xcat": "RIPPLE", "benefit": "Gives alfred the infrastructure to plug digital-asset settlement into its existing products without building it from scratch. This relationship is live today."},
+    {"num": 196, "key": "seed:196:altpaynet", "name": "AltPayNet", "flag": "🇵🇭", "country": "Philippines", "relationship": "Ripple Payments; stablecoin cross-border flows", "status": "Live", "date_str": "2026-03-03", "evidence": "Primary", "industry": "PAYMENTS FINTECH", "xcat": "RIPPLE", "benefit": "Gives AltPayNet a faster, lower-cost corridor for moving money internationally, benefiting the businesses and individuals who rely on it. This relationship is live today."},
+    {"num": 197, "key": "seed:197:banco genial", "name": "Banco Genial", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple Payments for cross-border payouts", "status": "Live", "date_str": "2026-03-03", "evidence": "Primary", "industry": "DIGITAL BANK", "xcat": "RIPPLE", "benefit": "Lets Banco Genial settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. This relationship is live today."},
+    {"num": 198, "key": "seed:198:cambioreal", "name": "CambioReal", "flag": "🇧🇷", "country": "Brazil", "relationship": "Ripple settlement layer integration", "status": "Live", "date_str": "2026-03-03", "evidence": "Primary", "industry": "PAYMENTS INFRASTRUCTURE", "xcat": "RIPPLE", "benefit": "Extends CambioReal's platform with faster, programmable settlement rails for its enterprise and institutional customers. This relationship is live today."},
+    {"num": 199, "key": "seed:199:sbi group / rlusd japan", "name": "SBI Group / RLUSD Japan", "flag": "🇯🇵", "country": "Japan", "relationship": "RLUSD launch/distribution in Japan via SBI VC Trade", "status": "Live", "date_str": "2026-06-24", "evidence": "Primary", "industry": "FINANCIAL CONGLOMERATE", "xcat": "RIPPLE", "benefit": "Lets SBI Group / RLUSD Japan settle cross-border transactions in real time instead of the multi-day delays typical of SWIFT-era rails. This relationship is live today."},
+]
 
-def load_static_partner_directory(force=False):
-    """(Re)loads the curated 100+ partnership list on a true 3-day elapsed-time cycle.
-    Currently placeholder pending Rich's real list. Purely static/curated data — no external API call."""
-    now = datetime.now(timezone.utc)
-    last = STATIC_PARTNER_DIRECTORY.get("_last_dt")
-    due = force or not last or (now - last).days >= STATIC_PARTNER_REFRESH_DAYS
-    if not due and STATIC_PARTNER_DIRECTORY["entries"]:
-        return
-    STATIC_PARTNER_DIRECTORY["entries"] = [
-        ("AMINA Bank", "FINMA-regulated digital asset institution with live native Ripple Payments", "ODL/XRP Live", "🚀", "🇨🇭"),
-        ("Azimo", "International digital money transmitter processing enterprise payouts", "ODL/XRP Live", "🚀", "🇪🇺"),
-        ("Bitso", "Core liquidity hub routing heavy institutional USD-to-MXN lanes", "ODL/XRP Live", "🚀", "🇲🇽"),
-        ("BTC Markets", "Currency bridge managing the AUD leg of regional ODL clearing", "ODL/XRP Live", "🚀", "🇦🇺"),
-        ("ChinaBank", "Clears Gulf-region corporate payments anchored to digital liquidity", "ODL/XRP Live", "🚀", "🇵🇭"),
-        ("CIBC", "Settles institutional growth transfers via ODL infrastructure", "ODL/XRP Live", "🚀", "🇨🇦"),
-        ("Coins.ph", "Digital consumer network handling incoming XRP liquid conversions", "ODL/XRP Live", "🚀", "🇵🇭"),
-        ("Cuallix", "First fintech to pilot original xRapid/ODL settlement engines", "ODL/XRP Live", "🚀", "🇺🇸"),
-        ("FlashFX", "Automated FX software routing transfers via on-chain token paths", "ODL/XRP Live", "🚀", "🇦🇺"),
-        ("Independent Reserve", "Regional liquidity exchange partner providing settlement architecture", "ODL/XRP Live", "🚀", "🇦🇺"),
-        ("iRemit", "Non-bank remittance giant using ledger for real-time treasury management", "ODL/XRP Live", "🚀", "🇵🇭"),
-        ("Mercury FX", "Enterprise currency platform processing instant commercial payments via XRP", "ODL/XRP Live", "🚀", "🇬🇧"),
-        ("MoneyMatch", "Digital conversion firm routing commercial payments to European endpoints", "ODL/XRP Live", "🚀", "🇲🇾"),
-        ("Novatti", "Payments processor using XRP ledger routes for Southeast Asian corridors", "ODL/XRP Live", "🚀", "🇦🇺"),
-        ("Pyypl", "Blockchain fintech offering consumer digital wallets via ODL", "ODL/XRP Live", "🚀", "🌍"),
-        ("Qatar National Bank", "Cross-border pipeline targeting Philippine remittance partners", "ODL/XRP Live", "🚀", "🇶🇦"),
-        ("SBI Remit / SBI Holdings", "Multi-corridor APAC retail & commercial remittance powered by XRP", "ODL/XRP Live", "🚀", "🇯🇵"),
-        ("Siam Commercial Bank", "Active live ODL corridors for inbound Japanese capital", "ODL/XRP Live", "🚀", "🇹🇭"),
-        ("Tranglo", "Regional processing giant fully integrated into ODL", "ODL/XRP Live", "🚀", "🇲🇾"),
-        ("Travelex Bank", "First operational Latin American bank using XRP liquidity corridors", "ODL/XRP Live", "🚀", "🇧🇷"),
-        ("UnionBank", "Automated processing for inbound domestic overseas worker remittances", "ODL/XRP Live", "🚀", "🇵🇭"),
-        ("X Money", "Retail cross-border digital financial platform using decentralized settlement", "ODL/XRP Live", "🚀", "🌐"),
-        ("Zand Bank", "Digital corporate bank processing payments via XRP and RLUSD", "ODL/XRP Live", "🚀", "🇦🇪"),
-        ("Akbank", "Early regional banking partner conducting secure real-time automated tests", "Global Banks", "🏛️", "🇹🇷"),
-        ("American Express", "Commercial B2B international payments clearing partner", "Global Banks", "🏛️", "🇺🇸"),
-        ("ANZ Bank", "Historical testing partner of the underlying clearing protocol", "Global Banks", "🏛️", "🇦🇺"),
-        ("Axis Bank", "Live infrastructure client managing real-time regional transaction tunnels", "Global Banks", "🏛️", "🇮🇳"),
-        ("Banco Santander", "Powers international One Pay FX app via RippleNet messaging", "Global Banks", "🏛️", "🇪🇸"),
-        ("Bank of America", "Infrastructure pilot participant holding patents referencing XRP settlement", "Global Banks", "🏛️", "🇺🇸"),
-        ("BBVA", "Corporate banking implementing cross-border branch liquidity trials", "Global Banks", "🏛️", "🇪🇸"),
-        ("BDO Unibank", "Major destination settlement point for international inbound money streams", "Global Banks", "🏛️", "🇵🇭"),
-        ("BMO Financial Group", "North American commercial entity exploring cross-border clearing efficiency", "Global Banks", "🏛️", "🇨🇦"),
-        ("CIMB Bank", "Deep integration node managing corridors across ASEAN borders", "Global Banks", "🏛️", "🇲🇾"),
-        ("Commonwealth Bank (CBA)", "Major retail institution participating in pilot ecosystem networks", "Global Banks", "🏛️", "🇦🇺"),
-        ("Deutsche Bank", "Combined Ripple blockchain architecture with legacy SWIFT mechanisms", "Global Banks", "🏛️", "🇩🇪"),
-        ("Federal Bank", "Major localized retail bank utilizing automated routing systems", "Global Banks", "🏛️", "🇮🇳"),
-        ("HSBC", "Multi-national banking network mapped via active system routing IDs", "Global Banks", "🏛️", "🇬🇧"),
-        ("IndusInd Bank", "Captures inbound international money transfers using decentralized engines", "Global Banks", "🏛️", "🇮🇳"),
-        ("ING Group", "Multi-national bank registered in regional backend messaging directories", "Global Banks", "🏛️", "🇳🇱"),
-        ("Intesa Sanpaolo", "Enterprise participant tracking structural digital payment innovations", "Global Banks", "🏛️", "🇮🇹"),
-        ("JPMorgan Chase", "Overlapping participant in multi-network settlement ledger groups", "Global Banks", "🏛️", "🌐"),
-        ("Kotak Mahindra Bank", "Fintech clearing provider handling instant retail capital inflows", "Global Banks", "🏛️", "🇮🇳"),
-        ("Krungsri (Bank of Ayudhya)", "Streamlines real-time corporate pipelines between Thailand and Japan", "Global Banks", "🏛️", "🇹🇭"),
-        ("Macquarie Bank", "Financial and transaction group listed on official routing logs", "Global Banks", "🏛️", "🇦🇺"),
-        ("MUFG Bank", "Tier-1 retail giant optimizing transaction messaging across APAC", "Global Banks", "🏛️", "🇯🇵"),
-        ("National Australia Bank (NAB)", "Incorporated into the ledger settlement network indexing systems", "Global Banks", "🏛️", "🇦🇺"),
-        ("PNC Bank", "First major domestic U.S. institutional network client", "Global Banks", "🏛️", "🇺🇸"),
-        ("Royal Bank of Canada (RBC)", "Explored the decentralized rail protocol for automated settlement", "Global Banks", "🏛️", "🇨🇦"),
-        ("SEB", "Operates high-volume corporate lines over Ripple software rails", "Global Banks", "🏛️", "🇸🇪"),
-        ("Shinhan Bank", "Top South Korean network client maintaining active system access keys", "Global Banks", "🏛️", "🇰🇷"),
-        ("Standard Chartered", "Core early corporate investor and active digital clearing hub collaborator", "Global Banks", "🏛️", "🇬🇧"),
-        ("UBS", "Asset and investment firm evaluating high-speed distributed ledgers", "Global Banks", "🏛️", "🇨🇭"),
-        ("Westpac", "Registered network member maintaining live backend communication IDs", "Global Banks", "🏛️", "🇦🇺"),
-        ("Woori Bank", "Multi-channel asset institution utilizing programmatic payment lines", "Global Banks", "🏛️", "🇰🇷"),
-        ("Yes Bank", "Commercial institution conducting high-velocity payment remittance operations", "Global Banks", "🏛️", "🇮🇳"),
-        ("Accenture", "Consulting giant managing global deployment strategies for payment architecture", "Tech/Custody", "🛠️", "🌐"),
-        ("Amazon Web Services (AWS)", "Hosts architecture allowing global nodes to run XRPL validation configurations", "Tech/Custody", "🛠️", "🌐"),
-        ("BDACS", "Regulated secure vault platform for native ledger token storage", "Tech/Custody", "🛠️", "🇰🇷"),
-        ("BeeTech", "Digital financial operator executing automated Latin American clearings", "Tech/Custody", "🛠️", "🇧🇷"),
-        ("BNY Mellon", "Primary tier-1 institutional reserve custodian for stablecoin offerings", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("CGI Group", "IT consulting firm incorporating decentralized financial frameworks", "Tech/Custody", "🛠️", "🇨🇦"),
-        ("Cross River Bank", "Financial tech enabler providing direct underlying banking backbone", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Currencycloud", "B2B multi-currency platform streamlining automated foreign exchange", "Tech/Custody", "🛠️", "🇬🇧"),
-        ("DBS Bank", "Southeast Asian institution utilizing bank-grade digital asset vaults", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("Deloitte", "Integrated distributed financial systems into client business models", "Tech/Custody", "🛠️", "🌐"),
-        ("DZ Bank", "Leverages digital custody solutions for tokenized asset issuance", "Tech/Custody", "🛠️", "🇩🇪"),
-        ("Fidor Bank", "Digital banking pioneer integrating alternative clearing protocol tools", "Tech/Custody", "🛠️", "🇩🇪"),
-        ("Finastra", "Core banking software opening network access to 2,000+ regional banks", "Tech/Custody", "🛠️", "🇬🇧"),
-        ("Frankenmuth Credit Union", "Local cooperative providing digital asset services to local consumers", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("GTreasury", "Corporate liquidity software suite managing modern capital balance sheets", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Hidden Road", "Major institutional prime brokerage expanding liquidity paths for digital assets", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("InstaReM", "High-speed digital payment gateway connected via localized nodes", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("Kbank", "Digital platform implementing secure cryptographic wallet structures", "Tech/Custody", "🛠️", "🇰🇷"),
-        ("Kyobo Life Insurance", "Utilizing token ledger blueprint for corporate structural bond settlement", "Tech/Custody", "🛠️", "🇰🇷"),
-        ("Metaco", "Institutional crypto custody firm acquired by Ripple to secure bank assets globally", "Tech/Custody", "🛠️", "🇨🇭"),
-        ("Modulr", "Payments provider optimizing massive local commercial transaction times", "Tech/Custody", "🛠️", "🇬🇧"),
-        ("Nium", "Fintech provider optimizing massive outbound payment paths across global corridors", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("Sabadell", "Commercial infrastructure partner running real-time corporate data modules", "Tech/Custody", "🛠️", "🇪🇸"),
-        ("Sentbe", "High-speed international remittance engine using the global banking network", "Tech/Custody", "🛠️", "🇰🇷"),
-        ("Temenos", "Core banking software provider embedding automated accounting rails", "Tech/Custody", "🛠️", "🇨🇭"),
-        ("Al Ansari Exchange", "High-volume Middle Eastern exchange network routing institutional transfers", "Regional", "🌍", "🇦🇪"),
-        ("Banco Rendimento", "Foreign currency commercial bank using optimized digital payment tunnels", "Regional", "🌍", "🇧🇷"),
-        ("Bank Alfalah", "Manages automated digital channels targeting the UAE-to-Pakistan corridor", "Regional", "🌍", "🇵🇰"),
-        ("bKash", "Mobile financial giant plugged in to capture worker remittances", "Regional", "🌍", "🇧🇩"),
-        ("Faysal Bank", "Specialized commercial banking provider processing inward retail cash flows", "Regional", "🌍", "🇵🇰"),
-        ("Interbank", "Traditional retail banking destination tied to alternative clearing systems", "Regional", "🌍", "🇵🇪"),
-        ("Intercorp", "Large conglomerate stabilizing localized payment legs for regional retail assets", "Regional", "🌍", "🇵🇪"),
-        ("Itau Unibanco", "Giant South American banking provider utilizing alternative communication networks", "Regional", "🌍", "🇧🇷"),
-        ("National Bank of Fujairah", "Trade finance group optimizing real-time B2B payment workflows", "Regional", "🌍", "🇦🇪"),
-        ("National Bank of Kuwait (NBK)", "Runs international corporate transfer paths targeting the Gulf", "Regional", "🌍", "🇰🇼"),
-        ("RAKBANK", "Integrates transaction routes to improve speed across enterprise pipelines", "Regional", "🌍", "🇦🇪"),
-        ("Saudi Central Bank (SAMA)", "Central entity piloting distributed frameworks for commercial branches", "Regional", "🌍", "🇸🇦"),
-        ("Vietcombank", "Explores modern asset frameworks under regional digital banking pilots", "Regional", "🌍", "🇻🇳"),
-        ("Bitwise Asset Management", "Regulated Wall Street provider offering institutional XRP exposure", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Canary Capital Partners", "Asset management firm deploying institutional-grade XRP capital avenues", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Franklin Templeton", "Legacy asset firm filing for exchange-traded digital investment products", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Grayscale Investments", "Asset manager operating the regulated Grayscale XRP Trust and spot fund", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Hashdex Asset Management", "Global investment manager offering systemic access to ledger tokens", "ETF/Treasury", "🟡", "🌐"),
-        ("Nature's Miracle Holding", "Agriculture Tech firm implementing a $20M Corporate Treasury on the XRPL", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Worksport Ltd.", "Clean automotive developer utilizing digital assets for inventory clearings", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Mastercard", "$9T payment network partnered with Ripple on settlement rails in 2026", "Global Banks", "🏛️", "🌐"),
-        ("Banco Genial", "Ripple Payments for cross-border payouts, live 2026", "ODL/XRP Live", "🚀", "🇧🇷"),
-        ("Thunes", "Brought stablecoin payouts to 11,500 SWIFT-connected banks via Ripple ODL routing", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("SendFriend", "ODL for international remittances", "ODL/XRP Live", "🚀", "🇺🇸"),
-        ("Remitr", "RippleNet for cross-border business payments", "ODL/XRP Live", "🚀", "🌐"),
-        ("Ondo Finance", "$323M+ tokenized US Treasury products on XRP Ledger", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Archax", "UK-regulated exchange bringing $1B tokenized assets onto XRPL by mid-2026", "Tech/Custody", "🛠️", "🇬🇧"),
-        ("Guggenheim Treasury Services", "Tokenized commercial paper / treasury products on XRPL", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("OpenEden", "Tokenized US Treasury products on the XRP Ledger", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("Zoniqx", "Prepared hundreds of millions in RWA for issuance on XRPL", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("abrdn", "£3.8B liquidity fund tokenized on XRPL via Archax (first tokenized MMF)", "ETF/Treasury", "🟡", "🇬🇧"),
-        ("Aviva Investors", "Announced tokenization partnership with Ripple in 2026", "ETF/Treasury", "🟡", "🇬🇧"),
-        ("Justoken", "Independent RWA tokenization project building on XRPL", "Tech/Custody", "🛠️", "🌐"),
-        ("Ctrl Alt", "Partnered with Ripple + Dubai Land Department for real estate tokenization", "Tech/Custody", "🛠️", "🇦🇪"),
-        ("Figment", "Staking infrastructure partnership for Ripple Custody (2026)", "Tech/Custody", "🛠️", "🌐"),
-        ("Securosys", "HSM support partnership for Ripple Custody (2026)", "Tech/Custody", "🛠️", "🇨🇭"),
-        ("Palisade", "Acquired by Ripple to expand custody stack", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Chainalysis", "Compliance tools integrated into Ripple Custody", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Doppler Finance", "Partnered with SBI Ripple Asia for XRP-based institutional yield products", "Tech/Custody", "🛠️", "🌏"),
-        ("SBI Digital Markets", "Segregated custody for SBI Ripple Asia XRP yield products", "Tech/Custody", "🛠️", "🇸🇬"),
-        ("Royal Monetary Authority of Bhutan", "National CBDC pilot on XRPL since 2021", "Regional", "🌍", "🇧🇹"),
-        ("Central Bank of Montenegro", "CBDC pilot exploring blockchain national currency on XRPL", "Regional", "🌍", "🇲🇪"),
-        ("Republic of Palau", "National stablecoin built with Ripple on XRPL", "Regional", "🌍", "🇵🇼"),
-        ("Banco de la Republica", "Central bank exploring XRPL for digital peso settlement", "Regional", "🌍", "🇨🇴"),
-        ("Reserve Bank of Australia", "Project Acacia deployed wholesale CBDC on XRPL in live tests with tokenized govt bonds", "Regional", "🌍", "🇦🇺"),
-        ("Monetary Authority of Singapore", "MAS sandbox projects using RLUSD for programmable trade finance", "Regional", "🌍", "🇸🇬"),
-        ("Hong Kong Monetary Authority", "e-HKD CBDC pilots involving XRPL infrastructure", "Regional", "🌍", "🇭🇰"),
-        ("Dubai Land Department", "Real estate tokenization on XRPL with Ripple + Ctrl Alt (2025)", "Regional", "🌍", "🇦🇪"),
-        ("21Shares", "Live XRP ETP issuer", "ETF/Treasury", "🟡", "🇨🇭"),
-        ("CoinShares", "Live XRP exchange-traded product issuer", "ETF/Treasury", "🟡", "🇪🇺"),
-        ("WisdomTree", "XRP ETF issuer", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("VanEck", "Live XRP ETF issuer", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("ProShares", "XRP futures/ETF product under review", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Volatility Shares", "XRP futures ETF issuer", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Teucrium", "Launched 2x leveraged XRP ETF", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Goldman Sachs", "Reported largest institutional XRP holder in the US", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Societe Generale (SG-FORGE)", "Launched EUR CoinVertible euro stablecoin on XRPL (Feb 2026)", "Global Banks", "🏛️", "🇫🇷"),
-        ("WebBank", "Settles fiat card transactions using RLUSD on XRPL (with Gemini)", "Global Banks", "🏛️", "🇺🇸"),
-        ("Gemini", "Card transaction settlement using RLUSD on the XRP Ledger", "Tech/Custody", "🛠️", "🇺🇸"),
-        ("Mastercard (RLUSD cards)", "Fiat card settlement via RLUSD on XRPL with WebBank + Gemini", "ETF/Treasury", "🟡", "🌐"),
-        ("BlackRock (BUIDL)", "BUIDL fund supported on Ripple Treasury platform routing via XRPL DEX", "ETF/Treasury", "🟡", "🇺🇸"),
-        ("Alloy Networks", "Runs an XRPL validator node — signal of active XRP settlement usage", "ODL/XRP Live", "🚀", "🌐"),
-        ("Onafriq", "Pan-African payments network using Ripple for cross-border corridors", "Regional", "🌍", "🌍"),
-        ("Ripple National Trust Bank", "OCC conditionally approved Dec 2025 — federally chartered trust bank", "Global Banks", "🏛️", "🇺🇸"),
-        ("Absa Group", "Major African bank exploring Ripple cross-border infrastructure", "Regional", "🌍", "🇿🇦"),
-        ("Fenasbac", "Brazil central bank innovation arm partnered on Ripple pilots", "Regional", "🌍", "🇧🇷"),
-        ("DZ Bank Digital", "Digital asset custody pilots involving XRPL infrastructure", "Global Banks", "🏛️", "🇩🇪"),
-    ]
-    STATIC_PARTNER_DIRECTORY["_last_dt"] = now
-    STATIC_PARTNER_DIRECTORY["last_refreshed"] = now.strftime("%Y-%m-%d %H:%M UTC")
+ENTERPRISE_CATEGORY_LABELS = {
+    "XRP": "\u25c6 XRP", "RIPPLE": "\u2248 Ripple", "XRPL": "\u25a4 XRPL",
+    "A": "\U0001F680 ODL/XRP Live", "B": "\U0001F3DB\uFE0F Global Banks", "C": "\U0001F6E0\uFE0F Tech/Custody",
+    "D": "\U0001F30D Regional", "E": "\U0001F7E1 ETF/Treasury",
+}
+ENTERPRISE_CATEGORY_COLORS = {
+    "XRP": "var(--gr)", "RIPPLE": "var(--bl)", "XRPL": "var(--tq)",
+    "A": "var(--gr)", "B": "var(--bl)", "C": "var(--tq)", "D": "var(--or)", "E": "var(--yl)",
+}
 
-load_static_partner_directory()
-# Ever-growing, never-trimmed. Seed = 100 known entities (undated baseline).
-# New entries detected from the live news feed get real timestamps and always sort above the baseline.
-PARTNERSHIP_LEDGER = []          # list of dicts: name, country, cat, status, detail, date(None or datetime), source, key
+import sqlite3
+PARTNERSHIP_DB_PATH = os.environ.get("PARTNERSHIP_DB_PATH", "/data/partnerships.db")
+# Change this in Railway's Variables tab (Settings → Variables → add
+# PARTNERSHIP_EXPORT_PASSWORD) any time, without touching this file.
+PARTNERSHIP_EXPORT_PASSWORD = os.environ.get("PARTNERSHIP_EXPORT_PASSWORD", "redrio-bridge-2026")
+
+def _pdb_connect():
+    """Falls back to a local (non-persistent) file if /data isn't mounted yet,
+    so the site still works before a Volume is attached — it just won't
+    survive a redeploy until one is."""
+    try:
+        os.makedirs(os.path.dirname(PARTNERSHIP_DB_PATH), exist_ok=True)
+        return sqlite3.connect(PARTNERSHIP_DB_PATH)
+    except Exception:
+        return sqlite3.connect("partnerships_fallback.db")
+
+def _pdb_init():
+    conn = _pdb_connect()
+    conn.execute("""CREATE TABLE IF NOT EXISTS partnerships (
+        key TEXT PRIMARY KEY, name TEXT, flag TEXT, country TEXT,
+        relationship TEXT, status TEXT, date_str TEXT, evidence TEXT,
+        industry TEXT, xcat TEXT, benefit TEXT, source TEXT, link TEXT,
+        added_at TEXT
+    )""")
+    conn.commit()
+    return conn
+
+def _pdb_seed_master():
+    conn = _pdb_init()
+    cur = conn.execute("SELECT COUNT(*) FROM partnerships WHERE source='baseline'")
+    if cur.fetchone()[0] == 0:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn.executemany(
+            "INSERT OR IGNORE INTO partnerships "
+            "(key,name,flag,country,relationship,status,date_str,evidence,industry,xcat,benefit,source,link,added_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [(e["key"], e["name"], e["flag"], e["country"], e["relationship"], e["status"],
+              e["date_str"], e["evidence"], e["industry"], e["xcat"], e["benefit"],
+              "baseline", None, now_iso) for e in MASTER_PARTNERSHIPS]
+        )
+        conn.commit()
+    conn.close()
+
+def _pdb_insert_detected(key, name, benefit, link, dt):
+    conn = _pdb_init()
+    conn.execute(
+        "INSERT OR IGNORE INTO partnerships "
+        "(key,name,flag,country,relationship,status,date_str,evidence,industry,xcat,benefit,source,link,added_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (key, name, "\U0001F195", None, benefit, "NEW", dt.strftime("%Y-%m-%d"), "Live feed",
+         "Auto-Detected", "NEW", benefit, "detected", link, dt.isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+# ── Manual export/import archive \u2014 free alternative to a paid Railway
+# Volume. Download /partnerships/export.json before each redeploy, drop the
+# file (named exactly PARTNERSHIP_IMPORT_FILENAME) next to main.py in the
+# next zip, and every entry it contains \u2014 baseline plus everything
+# auto-detected since \u2014 is re-seeded on boot. Purely additive: existing
+# keys are never overwritten, so re-importing the same file twice is safe.
+PARTNERSHIP_IMPORT_FILENAME = "partnership_archive.json"
+
+def _pdb_import_file(path=None):
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), PARTNERSHIP_IMPORT_FILENAME)
+    if not os.path.isfile(path):
+        return 0
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            rows = json.load(f)
+    except Exception:
+        return 0
+    if not isinstance(rows, list):
+        return 0
+    conn = _pdb_init()
+    inserted = 0
+    for r in rows:
+        try:
+            key = r.get("key")
+            if not key:
+                continue
+            cur = conn.execute("SELECT 1 FROM partnerships WHERE key=?", (key,))
+            if cur.fetchone():
+                continue
+            conn.execute(
+                "INSERT OR IGNORE INTO partnerships "
+                "(key,name,flag,country,relationship,status,date_str,evidence,industry,xcat,benefit,source,link,added_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (key, r.get("name"), r.get("flag"), r.get("country_name") or r.get("country"),
+                 r.get("relationship"), r.get("status"), r.get("date_str"), r.get("evidence"),
+                 r.get("industry"), r.get("cat"), r.get("benefit"),
+                 r.get("source", "detected"), r.get("link"), r.get("added_at") or datetime.now(timezone.utc).isoformat())
+            )
+            inserted += 1
+        except Exception:
+            continue
+    conn.commit()
+    conn.close()
+    return inserted
+
+def partnerships_export_json():
+    """Full current archive as a downloadable JSON snapshot \u2014 baseline plus
+    everything auto-detected since the last import. Re-upload this same file
+    next to main.py before your next deploy to carry every entry forward."""
+    ordered = sorted(PARTNERSHIP_LEDGER, key=lambda e: e["date"] or datetime(2000, 1, 1, tzinfo=timezone.utc), reverse=True)
+    out = []
+    for e in ordered:
+        out.append({
+            "key": e["key"], "name": e["name"], "flag": e.get("flag"),
+            "country": e.get("country"), "country_name": e.get("country_name"),
+            "relationship": e.get("relationship"), "status": e.get("status"),
+            "date_str": e.get("date_str"), "evidence": e.get("evidence"),
+            "industry": e.get("industry"), "cat": e.get("cat"), "benefit": e.get("benefit"),
+            "source": e.get("source"), "link": e.get("link"),
+            "added_at": e["date"].isoformat() if e.get("date") else None,
+        })
+    return json.dumps(out, indent=1, ensure_ascii=False)
+
+def _pdb_load_all():
+    conn = _pdb_init()
+    cur = conn.execute(
+        "SELECT key,name,flag,country,relationship,status,date_str,evidence,industry,xcat,benefit,source,link,added_at "
+        "FROM partnerships"
+    )
+    rows = cur.fetchall()
+    conn.close()
+    out = []
+    for (key, name, flag, country, relationship, status, date_str, evidence,
+         industry, xcat, benefit, source, link, added_at) in rows:
+        if source == "detected":
+            try:
+                dt = datetime.fromisoformat(added_at)
+            except Exception:
+                dt = datetime.now(timezone.utc)
+        else:
+            dt = _parse_partnership_date(date_str)
+        out.append({
+            "key": key, "name": name, "flag": flag or "\U0001F310",
+            "country": (f"{flag} {country}" if flag and country else (country or "")),
+            "country_name": country, "relationship": relationship, "status": status,
+            "detail": relationship, "date_str": date_str, "evidence": evidence,
+            "industry": industry, "cat": xcat, "benefit": benefit,
+            "date": dt, "source": source, "link": link,
+        })
+    return out
+
+def _parse_partnership_date(date_str):
+    """Parses master-list date strings for sorting. '\u22642019' (on or before
+    2019) sorts as Jan 1 2019; real ISO dates parse directly; unknown formats
+    fall back to the epoch so they sort last, never crash."""
+    if not date_str:
+        return datetime(2000, 1, 1, tzinfo=timezone.utc)
+    s = date_str.strip().lstrip("\u2264").strip()
+    try:
+        if len(s) == 4 and s.isdigit():
+            return datetime(int(s), 1, 1, tzinfo=timezone.utc)
+        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except Exception:
+        return datetime(2000, 1, 1, tzinfo=timezone.utc)
+
+# Ever-growing, never-trimmed, DB-backed. Seed = 199 curated master-list
+# entities with real dates. New entries detected from the live news feed get
+# real timestamps and are written straight into the same persistent table.
+PARTNERSHIP_LEDGER = []
 _PARTNERSHIP_SEEDED = False
 _PARTNERSHIP_SEEN_KEYS = set()
 _PARTNERSHIP_DEAL_KW = ["partner", "partnership", "collaborat", "agreement", "signs", "joins forces",
@@ -9672,19 +9883,18 @@ _PARTNERSHIP_DEAL_KW = ["partner", "partnership", "collaborat", "agreement", "si
                         "onboards", "adopts xrp", "adopts ripple"]
 
 def seed_partnership_ledger():
-    global _PARTNERSHIP_SEEDED
+    global _PARTNERSHIP_SEEDED, PARTNERSHIP_LEDGER, _PARTNERSHIP_SEEN_KEYS
     if _PARTNERSHIP_SEEDED:
         return
-    for name, country, cat, status, detail in ENTERPRISE_SEED:
-        PARTNERSHIP_LEDGER.append({
-            "key": f"seed:{name.lower()}", "name": name, "country": country, "cat": cat,
-            "status": status, "detail": detail, "date": None, "source": "baseline", "link": None,
-        })
+    _pdb_seed_master()
+    _pdb_import_file()  # re-adds any previously exported entries (free alt. to a paid Volume)
+    PARTNERSHIP_LEDGER = _pdb_load_all()
+    _PARTNERSHIP_SEEN_KEYS = {e["key"] for e in PARTNERSHIP_LEDGER}
     _PARTNERSHIP_SEEDED = True
 
 def _detect_partnership_deals(pool):
     for s in pool:
-        key = s["key"]
+        key = f"news:{s['key']}"
         if key in _PARTNERSHIP_SEEN_KEYS:
             continue
         text = (s["title"] + " " + s.get("summary", "")).lower()
@@ -9693,91 +9903,85 @@ def _detect_partnership_deals(pool):
         if not any(kw in text for kw in _PARTNERSHIP_DEAL_KW):
             continue
         _PARTNERSHIP_SEEN_KEYS.add(key)
+        benefit = s.get("summary", "") or f"Detected via live monitoring from {s['source']} \u2014 full write-up pending manual review."
+        _pdb_insert_detected(key, s["title"], benefit, s.get("link"), s["dt"])
         PARTNERSHIP_LEDGER.append({
-            "key": f"news:{key}", "name": s["title"], "country": None, "cat": "N",
-            "status": "NEW", "detail": s.get("summary", "") or s["source"], "date": s["dt"],
-            "source": "detected", "link": s.get("link"),
+            "key": key, "name": s["title"], "flag": "\U0001F195", "country": None, "country_name": None,
+            "cat": "NEW", "status": "NEW", "detail": benefit, "relationship": benefit,
+            "benefit": benefit, "date_str": s["dt"].strftime("%Y-%m-%d"), "evidence": "Live feed",
+            "industry": "Auto-Detected", "date": s["dt"], "source": "detected", "link": s.get("link"),
         })
 
-def recent_partnerships_html(days=7):
-    """MAIN page: only partnerships / TradFi deals detected in the last `days`.
+def recent_partnerships_html(limit=12):
+    """MAIN page: newest deals across the full persistent archive (master list
+    + auto-detected), newest date first. Feeds straight from the same table
+    the /partnerships Bridge page reads \u2014 nothing is copied, moved, or
+    ever backdated. Full history always lives at the Bridge page."""
+    ordered = sorted(PARTNERSHIP_LEDGER, key=lambda e: e["date"] or datetime(2000, 1, 1, tzinfo=timezone.utc), reverse=True)[:limit]
 
-    Ageing is implicit, not a separate store: this view and the full Global
-    Partnership Directory on the Institutional page both read the same
-    PARTNERSHIP_LEDGER. Once an entry passes the window it simply stops
-    matching here and continues to appear in the Directory -- so nothing is
-    ever moved, copied or lost, and nothing is ever backdated."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    recent = []
-    for e in PARTNERSHIP_LEDGER:
-        if e.get("source") != "detected" or not e.get("date"):
-            continue
-        try:
-            if e["date"].astimezone(timezone.utc) >= cutoff:
-                recent.append(e)
-        except Exception:
-            continue
-    recent.sort(key=lambda e: e["date"], reverse=True)
-
-    if not recent:
+    if not ordered:
         return ('<div class="home-base"><div class="home-base-icon">\U0001F91D</div>'
-                '<div class="home-base-title">No New Deals in the Last 7 Days</div>'
-                '<div class="home-base-sub">This section fills automatically as new '
-                'partnerships and traditional-finance deals are detected from the live '
-                'feed. Nothing is backdated or invented \u2014 an empty week is reported '
-                'as an empty week. The complete history stays in the Global Partnership '
-                'Directory on the <a href="/institutional" style="color:var(--hdr)">'
-                'Institutional</a> page.</div></div>')
+                '<div class="home-base-title">Loading Partnership Archive</div>'
+                '<div class="home-base-sub">The full catalogued list of XRP, Ripple, and XRPL deals '
+                'lives on the <a href="/partnerships" style="color:var(--hdr)">Bridge</a> page.</div></div>')
 
     out = ""
-    for e in recent:
+    for e in ordered:
         col = ENTERPRISE_CATEGORY_COLORS.get(e["cat"], "var(--tx)")
         title_html = (f'<a href="{html.escape(e["link"] or "#", quote=True)}" target="_blank" rel="noopener">'
                       f'{html.escape(e["name"])}</a>') if e.get("link") else html.escape(e["name"])
+        is_new = e["source"] == "detected"
         out += (
             f'<div class="pl-row">'
             f'<div class="pl-top"><span class="pl-cat" style="color:{col}">'
             f'{ENTERPRISE_CATEGORY_LABELS.get(e["cat"], "\U0001F195 New Deal")}</span>'
-            f'<span class="pl-new">\U0001F195 NEW</span>'
-            f'<span class="pl-status" style="color:{col}">{html.escape(e["status"])}</span>'
-            f'<span class="pl-when">{_time_ago(e["date"])}</span></div>'
+            + ('<span class="pl-new">\U0001F195 NEW</span>' if is_new else '')
+            + f'<span class="pl-status" style="color:{col}">{html.escape(e["status"])}</span>'
+            f'<span class="pl-when">{e.get("date_str","")}</span></div>'
             f'<div class="pl-name">{title_html}</div>'
-            f'<div class="pl-meta">{html.escape(e["detail"][:140])}</div>'
+            f'<div class="pl-meta">{html.escape((e.get("benefit") or e["detail"])[:160])}</div>'
             f'</div>')
     return out
 
 
-def partnership_ledger_html(limit=30):
-    detected = sorted((e for e in PARTNERSHIP_LEDGER if e["source"] == "detected"),
-                       key=lambda e: e["date"], reverse=True)
-    baseline = [e for e in PARTNERSHIP_LEDGER if e["source"] == "baseline"]
-    ordered = (detected + baseline)[:limit]
-    if not ordered:
-        return '<div class="empty">Directory loading\u2026</div>'
-    out = ""
+PARTNERSHIP_ICON_SVG = {
+    "XRP": '<svg viewBox="0 0 24 24"><path d="M5 5l7 6-7 6M19 5l-7 6 7 6" stroke-width="2.2"/></svg>',
+    "RIPPLE": '<svg viewBox="0 0 24 24"><path d="M3 17c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/><path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/><path d="M3 7c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/></svg>',
+    "XRPL": '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9.5h16M4 14.5h16M9.5 4v16M14.5 4v16"/></svg>',
+    "NEW": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>',
+}
+
+def partnerships_bridge_html():
+    """Full Global Partnership Bridge \u2014 every entity ever catalogued,
+    newest first, nothing ever removed. Reads the same persistent table as
+    the main-page feed."""
+    ordered = sorted(PARTNERSHIP_LEDGER, key=lambda e: e["date"] or datetime(2000, 1, 1, tzinfo=timezone.utc), reverse=True)
+    total = len(ordered)
+    cards = ""
     for e in ordered:
         col = ENTERPRISE_CATEGORY_COLORS.get(e["cat"], "var(--tx)")
-        if e["source"] == "detected":
-            badge = '<span class="pl-new">\U0001F195 NEW</span>'
-            when = _time_ago(e["date"])
-            title_html = (f'<a href="{html.escape(e["link"] or "#", quote=True)}" target="_blank" rel="noopener">'
-                          f'{html.escape(e["name"])}</a>')
-            meta = html.escape(e["detail"][:140])
-        else:
-            badge = ""
-            when = "Established"
-            title_html = html.escape(e["name"])
-            meta = f'{html.escape(e["country"] or "")} \u2014 {html.escape(e["detail"])}'
-        out += (
-            f'<div class="pl-row" data-cat="{e["cat"]}" data-text="{html.escape((e["name"] + " " + (e["country"] or "") + " " + e["detail"]).lower(), quote=True)}">'
-            f'<div class="pl-top"><span class="pl-cat" style="color:{col}">{ENTERPRISE_CATEGORY_LABELS.get(e["cat"], "\U0001F195 New Deal")}</span>'
-            f'{badge}<span class="pl-status" style="color:{col}">{html.escape(e["status"])}</span>'
-            f'<span class="pl-when">{when}</span></div>'
-            f'<div class="pl-name">{title_html}</div>'
-            f'<div class="pl-meta">{meta}</div>'
+        icon = PARTNERSHIP_ICON_SVG.get(e["cat"], PARTNERSHIP_ICON_SVG["NEW"])
+        flag = e.get("flag") or ""
+        country_name = e.get("country_name") or ""
+        title_html = (f'<a href="{html.escape(e["link"] or "#", quote=True)}" target="_blank" rel="noopener">'
+                      f'{html.escape(e["name"])}</a>') if e.get("link") else html.escape(e["name"])
+        is_new = e["source"] == "detected"
+        search_blob = html.escape((e["name"] + " " + country_name + " " + (e.get("relationship") or "") + " " + e["cat"]).lower(), quote=True)
+        cards += (
+            f'<div class="bdg-card" data-cat="{e["cat"]}" data-text="{search_blob}">'
+            f'<div class="bdg-top">'
+            f'<span class="bdg-icon" style="color:{col}">{icon}</span>'
+            f'<span class="bdg-catlabel" style="color:{col}">{ENTERPRISE_CATEGORY_LABELS.get(e["cat"], e["cat"])}</span>'
+            + (f'<span class="bdg-flag" title="{html.escape(country_name)}">{flag}</span>' if flag and e["source"] == "baseline" else '')
+            + ('<span class="bdg-newbadge">\U0001F195 NEW</span>' if is_new else '')
+            + f'<span class="bdg-date">{html.escape(e.get("date_str") or "")}</span>'
+            f'</div>'
+            f'<div class="bdg-name">{title_html}</div>'
+            f'<div class="bdg-rel">{html.escape(e.get("relationship") or "")} \u00b7 <span style="color:{col}">{html.escape(e["status"])}</span></div>'
+            f'<div class="bdg-benefit">{html.escape(e.get("benefit") or "")}</div>'
             f'</div>'
         )
-    return out
+    return cards, total
 
 
 SENTIMENT_HISTORY = {}   # date_str -> {"bull","bear","neut","total","_keys"}
@@ -11922,120 +12126,6 @@ USE_CASES = [
      "Ripple integrating XRP/XRPL for AI agent-to-agent payments \u2014 instant, programmable, low-cost settlement."),
 ]
 
-ENTERPRISE_CATEGORY_LABELS = {
-    "A": "\U0001F680 ODL/XRP Live", "B": "\U0001F3DB\uFE0F Global Banks", "C": "\U0001F6E0\uFE0F Tech/Custody",
-    "D": "\U0001F30D Regional", "E": "\U0001F7E1 ETF/Treasury",
-}
-ENTERPRISE_CATEGORY_COLORS = {"A": "var(--gr)", "B": "var(--bl)", "C": "var(--tq)", "D": "var(--or)", "E": "var(--yl)"}
-
-ENTERPRISE_SEED = [
-    # Category A: Live ODL / XRP Production Users (23)
-    ("SBI Remit / SBI Holdings", "\U0001F1EF\U0001F1F5 Japan", "A", "LIVE ODL", "Multi-corridor APAC retail & commercial remittance powered by XRP"),
-    ("Tranglo", "\U0001F1F2\U0001F1FE Malaysia/SE Asia", "A", "LIVE ODL", "Regional processing giant fully integrated into ODL"),
-    ("Bitso", "\U0001F1F2\U0001F1FD Mexico/LatAm", "A", "LIVE ODL", "Core liquidity hub routing heavy institutional USD-to-MXN lanes"),
-    ("Travelex Bank", "\U0001F1E7\U0001F1F7 Brazil", "A", "LIVE ODL", "First operational Latin American bank using XRP liquidity corridors"),
-    ("Zand Bank", "\U0001F1E6\U0001F1EA UAE", "A", "LIVE", "Digital corporate bank processing payments via XRP and RLUSD"),
-    ("AMINA Bank", "\U0001F1E8\U0001F1ED Switzerland", "A", "LIVE", "FINMA-regulated digital asset institution with live native Ripple Payments"),
-    ("Siam Commercial Bank", "\U0001F1F9\U0001F1ED Thailand", "A", "LIVE ODL", "Active live ODL corridors for inbound Japanese capital"),
-    ("UnionBank", "\U0001F1F5\U0001F1ED Philippines", "A", "LIVE ODL", "Automated processing for inbound domestic overseas worker remittances"),
-    ("CIBC", "\U0001F1E8\U0001F1E6 Canada", "A", "LIVE ODL", "Settles institutional growth transfers via ODL infrastructure"),
-    ("Qatar National Bank", "\U0001F1F6\U0001F1E6 Qatar", "A", "LIVE ODL", "Cross-border pipeline targeting Philippine remittance partners"),
-    ("ChinaBank", "\U0001F1F5\U0001F1ED Philippines", "A", "LIVE", "Clears Gulf-region corporate payments anchored to digital liquidity"),
-    ("Independent Reserve", "\U0001F1E6\U0001F1FA Australia", "A", "LIVE", "Regional liquidity exchange partner providing settlement architecture"),
-    ("BTC Markets", "\U0001F1E6\U0001F1FA Australia", "A", "LIVE", "Currency bridge managing the AUD leg of regional ODL clearing"),
-    ("Coins.ph", "\U0001F1F5\U0001F1ED Philippines", "A", "LIVE ODL", "Digital consumer network handling incoming XRP liquid conversions"),
-    ("FlashFX", "\U0001F1E6\U0001F1FA Australia", "A", "LIVE ODL", "Automated FX software routing transfers via on-chain token paths"),
-    ("Mercury FX", "\U0001F1EC\U0001F1E7 UK", "A", "LIVE ODL", "Enterprise currency platform processing instant commercial payments via XRP"),
-    ("Cuallix", "\U0001F1FA\U0001F1F8/\U0001F1F2\U0001F1FD USA/Mexico", "A", "PIONEER", "First fintech to pilot original xRapid/ODL settlement engines"),
-    ("X Money", "\U0001F310 Global", "A", "LIVE", "Retail cross-border digital financial platform using decentralized settlement"),
-    ("Novatti", "\U0001F1E6\U0001F1FA Australia", "A", "LIVE ODL", "Payments processor using XRP ledger routes for Southeast Asian corridors"),
-    ("iRemit", "\U0001F1F5\U0001F1ED Philippines", "A", "LIVE", "Non-bank remittance giant using ledger for real-time treasury management"),
-    ("Azimo", "\U0001F1EA\U0001F1FA Europe", "A", "LIVE", "International digital money transmitter processing enterprise payouts"),
-    ("Pyypl", "\U0001F30D Middle East/Africa", "A", "LIVE ODL", "Blockchain fintech offering consumer digital wallets via ODL"),
-    ("MoneyMatch", "\U0001F1F2\U0001F1FE Malaysia", "A", "LIVE", "Digital conversion firm routing commercial payments to European endpoints"),
-    # Category B: Global Banking Giants (32)
-    ("Bank of America", "\U0001F1FA\U0001F1F8 USA", "B", "PILOT", "Infrastructure pilot participant holding patents referencing XRP settlement"),
-    ("Banco Santander", "\U0001F1EA\U0001F1F8 Spain/UK", "B", "PRODUCTION", "Powers international One Pay FX app via RippleNet messaging"),
-    ("PNC Bank", "\U0001F1FA\U0001F1F8 USA", "B", "PRODUCTION", "First major domestic U.S. institutional network client"),
-    ("American Express", "\U0001F1FA\U0001F1F8 USA", "B", "PRODUCTION", "Commercial B2B international payments clearing partner"),
-    ("Deutsche Bank", "\U0001F1E9\U0001F1EA Germany", "B", "PILOT", "Combined Ripple blockchain architecture with legacy SWIFT mechanisms"),
-    ("Standard Chartered", "\U0001F1EC\U0001F1E7 UK", "B", "PRODUCTION", "Core early corporate investor and active digital clearing hub collaborator"),
-    ("JPMorgan Chase", "\U0001F310 Global", "B", "PARTICIPANT", "Overlapping participant in multi-network settlement ledger groups"),
-    ("HSBC", "\U0001F1EC\U0001F1E7 UK", "B", "PARTICIPANT", "Multi-national banking network mapped via active system routing IDs"),
-    ("MUFG Bank", "\U0001F1EF\U0001F1F5 Japan", "B", "PRODUCTION", "Tier-1 retail giant optimizing transaction messaging across APAC"),
-    ("ING Group", "\U0001F1F3\U0001F1F1 Netherlands", "B", "REGISTERED", "Multi-national bank registered in regional backend messaging directories"),
-    ("BBVA", "\U0001F1EA\U0001F1F8 Spain", "B", "PILOT", "Corporate banking implementing cross-border branch liquidity trials"),
-    ("Commonwealth Bank (CBA)", "\U0001F1E6\U0001F1FA Australia", "B", "PILOT", "Major retail institution participating in pilot ecosystem networks"),
-    ("Westpac", "\U0001F1E6\U0001F1FA Australia", "B", "REGISTERED", "Registered network member maintaining live backend communication IDs"),
-    ("ANZ Bank", "\U0001F1E6\U0001F1FA Australia", "B", "HISTORICAL", "Historical testing partner of the underlying clearing protocol"),
-    ("National Australia Bank (NAB)", "\U0001F1E6\U0001F1FA Australia", "B", "REGISTERED", "Incorporated into the ledger settlement network indexing systems"),
-    ("Macquarie Bank", "\U0001F1E6\U0001F1FA Australia", "B", "REGISTERED", "Financial and transaction group listed on official routing logs"),
-    ("Royal Bank of Canada (RBC)", "\U0001F1E8\U0001F1E6 Canada", "B", "EXPLORING", "Explored the decentralized rail protocol for automated settlement"),
-    ("SEB", "\U0001F1F8\U0001F1EA Sweden", "B", "PRODUCTION", "Operates high-volume corporate lines over Ripple software rails"),
-    ("UBS", "\U0001F1E8\U0001F1ED Switzerland", "B", "EVALUATING", "Asset and investment firm evaluating high-speed distributed ledgers"),
-    ("BMO Financial Group", "\U0001F1E8\U0001F1E6 Canada", "B", "EXPLORING", "North American commercial entity exploring cross-border clearing efficiency"),
-    ("Intesa Sanpaolo", "\U0001F1EE\U0001F1F9 Italy", "B", "PARTICIPANT", "Enterprise participant tracking structural digital payment innovations"),
-    ("Akbank", "\U0001F1F9\U0001F1F7 Turkey", "B", "PILOT", "Early regional banking partner conducting secure real-time automated tests"),
-    ("Axis Bank", "\U0001F1EE\U0001F1F3 India", "B", "LIVE", "Live infrastructure client managing real-time regional transaction tunnels"),
-    ("IndusInd Bank", "\U0001F1EE\U0001F1F3 India", "B", "LIVE", "Captures inbound international money transfers using decentralized engines"),
-    ("Kotak Mahindra Bank", "\U0001F1EE\U0001F1F3 India", "B", "LIVE", "Fintech clearing provider handling instant retail capital inflows"),
-    ("Yes Bank", "\U0001F1EE\U0001F1F3 India", "B", "LIVE", "Commercial institution conducting high-velocity payment remittance operations"),
-    ("Federal Bank", "\U0001F1EE\U0001F1F3 India", "B", "LIVE", "Major localized retail bank utilizing automated routing systems"),
-    ("Shinhan Bank", "\U0001F1F0\U0001F1F7 South Korea", "B", "LIVE", "Top South Korean network client maintaining active system access keys"),
-    ("Woori Bank", "\U0001F1F0\U0001F1F7 South Korea", "B", "LIVE", "Multi-channel asset institution utilizing programmatic payment lines"),
-    ("Krungsri (Bank of Ayudhya)", "\U0001F1F9\U0001F1ED Thailand", "B", "LIVE", "Streamlines real-time corporate pipelines between Thailand and Japan"),
-    ("CIMB Bank", "\U0001F1F2\U0001F1FE Malaysia", "B", "LIVE", "Deep integration node managing corridors across ASEAN borders"),
-    ("BDO Unibank", "\U0001F1F5\U0001F1ED Philippines", "B", "LIVE", "Major destination settlement point for international inbound money streams"),
-    # Category C: Enterprise Tech, Custody & Infrastructure (25)
-    ("Amazon Web Services (AWS)", "\U0001F310 Global", "C", "INFRASTRUCTURE", "Hosts architecture allowing global nodes to run XRPL validation configurations"),
-    ("Finastra", "\U0001F1EC\U0001F1E7 UK", "C", "PRODUCTION", "Core banking software opening network access to 2,000+ regional banks"),
-    ("Deloitte", "\U0001F310 Global", "C", "PRODUCTION", "Integrated distributed financial systems into client business models"),
-    ("DZ Bank", "\U0001F1E9\U0001F1EA Germany", "C", "PRODUCTION", "Leverages digital custody solutions for tokenized asset issuance"),
-    ("BNY Mellon", "\U0001F1FA\U0001F1F8 USA", "C", "PRODUCTION", "Primary tier-1 institutional reserve custodian for stablecoin offerings"),
-    ("DBS Bank", "\U0001F1F8\U0001F1EC Singapore", "C", "LIVE", "Southeast Asian institution utilizing bank-grade digital asset vaults"),
-    ("Kbank", "\U0001F1F0\U0001F1F7 South Korea", "C", "LIVE", "Digital platform implementing secure cryptographic wallet structures"),
-    ("Kyobo Life Insurance", "\U0001F1F0\U0001F1F7 South Korea", "C", "LIVE", "Utilizing token ledger blueprint for corporate structural bond settlement"),
-    ("BDACS", "\U0001F1F0\U0001F1F7 South Korea", "C", "LIVE", "Regulated secure vault platform for native ledger token storage"),
-    ("Hidden Road", "\U0001F1FA\U0001F1F8 USA", "C", "EXPANDING", "Major institutional prime brokerage expanding liquidity paths for digital assets"),
-    ("GTreasury", "\U0001F1FA\U0001F1F8 USA", "C", "LIVE", "Corporate liquidity software suite managing modern capital balance sheets"),
-    ("Metaco", "\U0001F1E8\U0001F1ED Switzerland", "C", "ACQUIRED", "Institutional crypto custody firm acquired by Ripple to secure bank assets globally"),
-    ("Temenos", "\U0001F1E8\U0001F1ED Switzerland", "C", "PRODUCTION", "Core banking software provider embedding automated accounting rails"),
-    ("Accenture", "\U0001F310 Global", "C", "PRODUCTION", "Consulting giant managing global deployment strategies for payment architecture"),
-    ("CGI Group", "\U0001F1E8\U0001F1E6 Canada", "C", "PRODUCTION", "IT consulting firm incorporating decentralized financial frameworks"),
-    ("Modulr", "\U0001F1EC\U0001F1E7 UK/Europe", "C", "LIVE", "Payments provider optimizing massive local commercial transaction times"),
-    ("Sentbe", "\U0001F1F0\U0001F1F7 South Korea", "C", "LIVE", "High-speed international remittance engine using the global banking network"),
-    ("Currencycloud", "\U0001F1EC\U0001F1E7 UK", "C", "LIVE", "B2B multi-currency platform streamlining automated foreign exchange"),
-    ("Nium", "\U0001F1F8\U0001F1EC Singapore", "C", "LIVE", "Fintech provider optimizing massive outbound payment paths across global corridors"),
-    ("InstaReM", "\U0001F1F8\U0001F1EC Singapore", "C", "LIVE", "High-speed digital payment gateway connected via localized nodes"),
-    ("BeeTech", "\U0001F1E7\U0001F1F7 Brazil", "C", "LIVE", "Digital financial operator executing automated Latin American clearings"),
-    ("Fidor Bank", "\U0001F1E9\U0001F1EA Germany", "C", "PIONEER", "Digital banking pioneer integrating alternative clearing protocol tools"),
-    ("Sabadell", "\U0001F1EA\U0001F1F8 Spain", "C", "LIVE", "Commercial infrastructure partner running real-time corporate data modules"),
-    ("Cross River Bank", "\U0001F1FA\U0001F1F8 USA", "C", "LIVE", "Financial tech enabler providing direct underlying banking backbone"),
-    ("Frankenmuth Credit Union", "\U0001F1FA\U0001F1F8 USA", "C", "LIVE", "Local cooperative providing digital asset services to local consumers"),
-    # Category D: Regional / Middle East / LatAm (13)
-    ("Al Ansari Exchange", "\U0001F1E6\U0001F1EA UAE", "D", "LIVE", "High-volume Middle Eastern exchange network routing institutional transfers"),
-    ("National Bank of Fujairah", "\U0001F1E6\U0001F1EA UAE", "D", "LIVE", "Trade finance group optimizing real-time B2B payment workflows"),
-    ("Saudi Central Bank (SAMA)", "\U0001F1F8\U0001F1E6 Saudi Arabia", "D", "PILOT", "Central entity piloting distributed frameworks for commercial branches"),
-    ("National Bank of Kuwait (NBK)", "\U0001F1F0\U0001F1FC Kuwait", "D", "LIVE", "Runs international corporate transfer paths targeting the Gulf"),
-    ("RAKBANK", "\U0001F1E6\U0001F1EA UAE", "D", "LIVE", "Integrates transaction routes to improve speed across enterprise pipelines"),
-    ("Itau Unibanco", "\U0001F1E7\U0001F1F7 Brazil", "D", "LIVE", "Giant South American banking provider utilizing alternative communication networks"),
-    ("Banco Rendimento", "\U0001F1E7\U0001F1F7 Brazil", "D", "LIVE", "Foreign currency commercial bank using optimized digital payment tunnels"),
-    ("Intercorp", "\U0001F1F5\U0001F1EA Peru", "D", "LIVE", "Large conglomerate stabilizing localized payment legs for regional retail assets"),
-    ("Faysal Bank", "\U0001F1F5\U0001F1F0 Pakistan", "D", "LIVE", "Specialized commercial banking provider processing inward retail cash flows"),
-    ("Bank Alfalah", "\U0001F1F5\U0001F1F0 Pakistan", "D", "LIVE", "Manages automated digital channels targeting the UAE-to-Pakistan corridor"),
-    ("bKash", "\U0001F1E7\U0001F1E9 Bangladesh", "D", "LIVE", "Mobile financial giant plugged in to capture worker remittances"),
-    ("Vietcombank", "\U0001F1FB\U0001F1F3 Vietnam", "D", "PILOT", "Explores modern asset frameworks under regional digital banking pilots"),
-    ("Interbank", "\U0001F1F5\U0001F1EA Peru", "D", "LIVE", "Traditional retail banking destination tied to alternative clearing systems"),
-    # Category E: ETF Issuers & Corporate Treasury (7)
-    ("Grayscale Investments", "\U0001F1FA\U0001F1F8 USA", "E", "LIVE ETF", "Asset manager operating the regulated Grayscale XRP Trust and spot fund"),
-    ("Bitwise Asset Management", "\U0001F1FA\U0001F1F8 USA", "E", "LIVE ETF", "Regulated Wall Street provider offering institutional XRP exposure"),
-    ("Franklin Templeton", "\U0001F1FA\U0001F1F8 USA", "E", "FILED", "Legacy asset firm filing for exchange-traded digital investment products"),
-    ("Canary Capital Partners", "\U0001F1FA\U0001F1F8 USA", "E", "LIVE ETF", "Asset management firm deploying institutional-grade XRP capital avenues"),
-    ("Hashdex Asset Management", "\U0001F310 Global", "E", "LIVE ETF", "Global investment manager offering systemic access to ledger tokens"),
-    ("Worksport Ltd.", "\U0001F1FA\U0001F1F8 USA", "E", "TREASURY", "Clean automotive developer utilizing digital assets for inventory clearings"),
-    ("Nature's Miracle Holding", "\U0001F1FA\U0001F1F8 USA", "E", "TREASURY", "Agriculture Tech firm implementing a $20M Corporate Treasury on the XRPL"),
-]
-
 COUNTRY_STATUS = [
     ("United States", "\U0001F1FA\U0001F1F8", "CONTESTED", "SEC lawsuit settled; XRP non-security ruling in programmatic sales. Evolving clarity."),
     ("European Union", "\U0001F1EA\U0001F1FA", "LEGAL", "MiCA regulation fully in force. XRP classified as crypto-asset, not security."),
@@ -13019,30 +13109,15 @@ def render_page(page="main"):
     mica_html = mica_calendar_html()
     cbdc_html = cbdc_grid_html()
 
-    # Global XRP Enterprise & Partnership Ledger
-    pl_html = partnership_ledger_html()
-    # V132: MAIN-page "new this week" view over the same ledger
-    nd_html = recent_partnerships_html(days=7)
+    # Global Partnership Bridge \u2014 single persistent archive (main-page feed + full /partnerships page)
+    nd_html = recent_partnerships_html(limit=12)
     nd_count = nd_html.count('class="pl-row"')
     pl_total = len(PARTNERSHIP_LEDGER)
     pl_detected = sum(1 for e in PARTNERSHIP_LEDGER if e["source"] == "detected")
-
-    # Static Global Partnership Directory (right rail, refreshes every 3 days)
-    sd_entries = STATIC_PARTNER_DIRECTORY.get("entries", [])
-    sd_updated = STATIC_PARTNER_DIRECTORY.get("last_refreshed") or "\u2014"
-    sd_count = len(sd_entries)
-    sd_html = "".join(
-        f'<div class="sd-item">'
-        f'<div class="sd-item-top"><span class="sd-flag">{flag}</span>'
-        f'<span class="sd-name">{html.escape(name)}</span></div>'
-        f'<span class="sd-cat">{cat_emoji} {html.escape(cat_lbl)}</span>'
-        f'<span class="sd-desc">{html.escape(desc)}</span></div>'
-        for name, desc, cat_lbl, cat_emoji, flag in sd_entries
-    ) or '<div class="sd-empty">Directory loading\u2026</div>'
-
-    pl_by_cat = {}
-    for e in PARTNERSHIP_LEDGER:
-        pl_by_cat[e["cat"]] = pl_by_cat.get(e["cat"], 0) + 1
+    bridge_cards_html, bridge_total = partnerships_bridge_html()
+    bridge_xrp_n = sum(1 for e in PARTNERSHIP_LEDGER if e["cat"] == "XRP")
+    bridge_ripple_n = sum(1 for e in PARTNERSHIP_LEDGER if e["cat"] == "RIPPLE")
+    bridge_xrpl_n = sum(1 for e in PARTNERSHIP_LEDGER if e["cat"] == "XRPL")
 
     # Advanced Metrics
     ts_html = tech_specs_html()
@@ -13699,6 +13774,63 @@ def render_page(page="main"):
   .pl-name a:hover{{ text-decoration:underline; }}
   .pl-meta{{ font-size:12px; color:var(--tx); line-height:1.5; font-family:system-ui; }}
   .pl-counter{{ font-size:22px; font-weight:900; font-family:var(--mn); color:var(--yl); }}
+  .bdg-cta{{ display:inline-block; margin-top:12px; padding:10px 18px; border-radius:8px; background:var(--hdr);
+    color:#fff; font-family:var(--mn); font-weight:800; font-size:13px; letter-spacing:.3px; text-decoration:none; }}
+  .bdg-cta:hover{{ opacity:.88; }}
+
+  /* Global Partnership Bridge \u2014 full archive page (V174) */
+  .bdg-wrap{{ width:100%; box-sizing:border-box; }}
+  .bdg-legend{{ display:flex; flex-wrap:wrap; gap:18px; margin-bottom:14px; font-family:var(--mn); font-size:14px; font-weight:700; }}
+  .bdg-legend-item{{ display:flex; align-items:center; gap:6px; }}
+  .bdg-legend-item svg{{ width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }}
+  .bdg-legend-item b{{ color:var(--br); font-size:15px; }}
+  .bdg-export-bottom{{ margin-top:18px; padding-top:16px; border-top:1px solid var(--b); text-align:center; }}
+  .bdg-export{{ padding:10px 20px; border-radius:8px; background:var(--gr); color:#08130a; border:none;
+    font-family:var(--mn); font-weight:800; font-size:13px; letter-spacing:.3px; cursor:pointer; }}
+  .bdg-export:hover{{ opacity:.88; }}
+  .bdg-export-note{{ font-size:12px; color:var(--tx); font-family:system-ui; line-height:1.6; margin:10px auto 0; max-width:560px; opacity:.85; }}
+  .bdg-export-note code{{ font-family:var(--mn); background:var(--s2); padding:1px 5px; border-radius:4px; }}
+  .bdg-export{{ margin-left:auto; padding:6px 14px; border-radius:7px; background:var(--gr); color:#08130a;
+    font-family:var(--mn); font-weight:800; font-size:12px; letter-spacing:.3px; text-decoration:none; }}
+  .bdg-export:hover{{ opacity:.88; }}
+  .bdg-export-note{{ font-size:12px; color:var(--tx); font-family:system-ui; line-height:1.5; margin:-6px 0 14px; opacity:.85; }}
+  .bdg-controls{{ margin-bottom:10px; }}
+  .bdg-search{{ width:100%; box-sizing:border-box; background:#e9ecf1; border:1px solid #c3c8d1; border-radius:8px;
+    color:#1a2a4a; font-family:var(--mn); font-size:15px; padding:11px 14px; margin-bottom:10px; }}
+  .bdg-search::placeholder{{ color:#6b7280; }}
+  .bdg-cats{{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }}
+  .bdg-btn{{ padding:6px 13px; border-radius:6px; font-size:12px; font-weight:700; font-family:var(--mn); letter-spacing:.5px;
+    border:1px solid var(--b); background:transparent; color:var(--tx); cursor:pointer; opacity:.75; }}
+  .bdg-btn:hover{{ opacity:1; }}
+  .bdg-btn.active{{ opacity:1; box-shadow:0 0 0 1px currentColor inset; }}
+  .bdg-stats{{ font-size:15px; font-family:var(--mn); color:var(--tx); margin-bottom:6px; }}
+  .bdg-stats b{{ color:var(--yl); }}
+
+  /* Highly visible custom scrollbar \u2014 requirement: prominent, easy to see and grab */
+  .bdg-scrollpanel{{ display:flex; flex-direction:column; gap:10px; max-height:900px; overflow-y:scroll;
+    padding:4px 16px 4px 4px; margin-right:-4px; border:1px solid var(--b); border-radius:10px; background:var(--s2);
+    scrollbar-width:auto; scrollbar-color:#008CFF var(--s1); }}
+  .bdg-scrollpanel::-webkit-scrollbar{{ width:18px; }}
+  .bdg-scrollpanel::-webkit-scrollbar-track{{ background:var(--s1); border-radius:10px; border:1px solid var(--b); }}
+  .bdg-scrollpanel::-webkit-scrollbar-thumb{{ background:linear-gradient(180deg,#008CFF,#0066CC); border-radius:10px;
+    border:3px solid var(--s1); min-height:40px; }}
+  .bdg-scrollpanel::-webkit-scrollbar-thumb:hover{{ background:linear-gradient(180deg,#3aa5ff,#008CFF); }}
+  @media(max-width:700px){{ .bdg-scrollpanel{{ max-height:640px; padding-right:10px; }}
+    .bdg-scrollpanel::-webkit-scrollbar{{ width:14px; }} }}
+
+  .bdg-card{{ background:var(--s1); border:1px solid var(--b); border-radius:8px; padding:12px 14px; }}
+  .bdg-top{{ display:flex; align-items:center; gap:9px; margin-bottom:5px; flex-wrap:wrap; }}
+  .bdg-icon svg{{ width:19px; height:19px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; display:block; }}
+  .bdg-catlabel{{ font-size:12px; font-weight:800; font-family:var(--mn); letter-spacing:.5px; }}
+  .bdg-flag{{ font-size:17px; line-height:1; }}
+  .bdg-newbadge{{ font-size:12px; font-weight:900; font-family:var(--mn); color:var(--bg); background:var(--yl);
+    padding:1px 6px; border-radius:4px; letter-spacing:.5px; }}
+  .bdg-date{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-left:auto; }}
+  .bdg-name{{ font-size:16px; font-weight:800; color:var(--br); font-family:system-ui; margin-bottom:3px; }}
+  .bdg-name a{{ color:var(--hdr); text-decoration:none; }}
+  .bdg-name a:hover{{ text-decoration:underline; }}
+  .bdg-rel{{ font-size:12px; color:var(--tx); font-family:var(--mn); margin-bottom:6px; }}
+  .bdg-benefit{{ font-size:14px; color:var(--br); line-height:1.6; font-family:system-ui; opacity:.92; }}
 
   /* Advanced Metrics */
   .am-grid2{{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }}
@@ -14327,6 +14459,10 @@ def render_page(page="main"):
                          '<path d="M7 11h1.5M7 14h1.5M7 17h1.5"/>'
                          '<path d="M15.5 7h1.5M15.5 10h1.5M15.5 13h1.5M15.5 16h1.5"/>'
                          '<path d="M3 21h18"/></svg>',
+        "partnerships":  '<svg viewBox="0 0 24 24"><path d="M2 17c2.5-6 4.5-6 5.5-6s2 1 2 3-1 3-2 3-3-1-3-3"/>'
+                         '<path d="M22 17c-2.5-6-4.5-6-5.5-6s-2 1-2 3 1 3 2 3 3-1 3-3"/>'
+                         '<path d="M2 20h20M4 17V9M20 17V9M4 9l2-3M20 9l-2-3"/>'
+                         '<path d="M9.5 14h5"/></svg>',
         "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 2v2"/>'
                          '<path d="M8.5 8.5a3.5 3.5 0 0 1 7 0"/><path d="M7.5 8.5h9"/>'
                          '<path d="M5.5 11.5h13"/><path d="M7 11.5v6.5M10.3 11.5v6.5M13.7 11.5v6.5M17 11.5v6.5"/>'
@@ -14348,6 +14484,7 @@ def render_page(page="main"):
     }
     _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
               ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
+              ("partnerships","/partnerships","BRIDGE"),
               ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"),
               ("competition","/competition","COMPETITION"), ("about","/about","ABOUT"),
               ("blog","https://xrpcompleteblog.com","BLOG"))
@@ -15292,66 +15429,76 @@ def render_page(page="main"):
 
 """
 
-    _B['newdeals'] = f"""    <!-- SECTION 27b: NEW PARTNERSHIPS & DEALS \u2014 LAST 7 DAYS (V132) -->
+    _B['newdeals'] = f"""    <!-- SECTION 27b: NEW PARTNERSHIPS & DEALS \u2014 NEWEST FIRST (V174) -->
     <div id="newdeals" class="acct" style="border-color:rgba(72,255,130,.35);margin:10px 0">
-      <div class="sec-title" style="color:var(--gr)"><span class="sic">\U0001F91D</span> New Partnerships &amp; Deals \u2014 This Week</div>
-      <div class="trk-tag" style="color:var(--tx)">Only partnerships and traditional-finance deals detected in the last 7 days \u2014 {nd_count} currently listed. Updates automatically as the feed runs; entries older than a week roll into the <a href="/institutional" style="color:var(--hdr)">Global Partnership Directory</a>.</div>
+      <div class="sec-title" style="color:var(--gr)"><span class="sic">\U0001F91D</span> New Partnerships &amp; Deals</div>
+      <div class="trk-tag" style="color:var(--tx)">The {nd_count} most recent entries in the Global Partnership Bridge \u2014 newest first. The complete, ever-growing archive of all {pl_total}+ XRP, Ripple, and XRPL deals lives on the <a href="/partnerships" style="color:var(--hdr)">Bridge</a> page.</div>
       <div class="pl-list" style="margin-top:10px">
         {nd_html}
       </div>
+      <a href="/partnerships" class="bdg-cta">\U0001F309 View the Full Global Partnership Bridge ({pl_total}+ entries) \u2192</a>
     </div>
 
 """
 
-    _B['enterprise'] = f"""    <!-- SECTION 27: GLOBAL XRP ENTERPRISE & PARTNERSHIP LEDGER -->
+    _B['enterprise'] = f"""    <!-- SECTION 27: GLOBAL PARTNERSHIP BRIDGE TEASER (V174) -->
     <div class="acct" style="border-color:rgba(255,204,0,.35);margin:10px 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
-        <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F310</span> Global XRP Enterprise &amp; Partnership Ledger</div>
+        <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F309</span> Global Partnership Bridge</div>
         <div style="text-align:right"><div class="pl-counter">{pl_total}+</div><div style="font-size:12px;color:var(--tx);font-family:var(--mn)">institutions &amp; deals</div></div>
       </div>
-      <div style="font-size:15px;color:var(--tx);line-height:1.7;font-family:system-ui;margin-bottom:12px;max-width:900px">
-        An ever-growing record of banks, institutions, and enterprises using XRP, XRPL, or Ripple technology \u2014 from
-        foundational partnerships to newly announced deals. New entries are detected automatically from the live news feed
-        and added here permanently; nothing is ever removed. Newest announcements shown first.
-        Fresh deals appear first under <a href="/#newdeals" style="color:var(--hdr)">New Partnerships &amp; Deals \u2014 This Week</a>
-        on the Main page and roll into this permanent directory once they pass seven days. Both views read the same ledger,
-        so nothing is copied, moved or lost in the handover \u2014 and no entry is ever added by hand.
+      <div style="font-size:15px;color:var(--tx);line-height:1.7;font-family:system-ui;margin-bottom:14px;max-width:900px">
+        An ever-growing, never-trimmed record of every publicly identifiable XRP, Ripple, and XRPL relationship \u2014
+        banks, exchanges, custodians, governments, and enterprises \u2014 with country of origin, category, closing
+        date, and a plain-English note on what each deal actually gets its partner. New deals detected from the
+        live news feed are added permanently alongside the curated baseline; nothing is ever removed.
+        {pl_detected} entries have been auto-detected from live coverage so far.
       </div>
-      <div class="feed-wrap">
-        <div>
-          <input class="pl-search" id="pl-search" type="text" placeholder="\U0001F50D Search institution, country, category..." oninput="filterPartnerships()">
-      <div class="pl-cats" id="pl-cats">
-        <button class="pl-btn active" data-cat="ALL" style="color:var(--br);border-color:var(--br)" onclick="plCat('ALL',this)">ALL</button>
-        <button class="pl-btn" data-cat="A" style="color:var(--gr);border-color:var(--gr)" onclick="plCat('A',this)">\U0001F680 ODL/XRP Live</button>
-        <button class="pl-btn" data-cat="B" style="color:var(--bl);border-color:var(--bl)" onclick="plCat('B',this)">\U0001F3DB\uFE0F Global Banks</button>
-        <button class="pl-btn" data-cat="C" style="color:var(--tq);border-color:var(--tq)" onclick="plCat('C',this)">\U0001F6E0\uFE0F Tech/Custody</button>
-        <button class="pl-btn" data-cat="D" style="color:var(--or);border-color:var(--or)" onclick="plCat('D',this)">\U0001F30D Regional</button>
-        <button class="pl-btn" data-cat="E" style="color:var(--yl);border-color:var(--yl)" onclick="plCat('E',this)">\U0001F7E1 ETF/Treasury</button>
-        <button class="pl-btn" data-cat="N" style="color:var(--yl);border-color:var(--yl)" onclick="plCat('N',this)">\U0001F195 New Deals</button>
+      <a href="/partnerships" class="bdg-cta">\U0001F309 Open the Full Global Partnership Bridge \u2192</a>
+    </div>
+
+"""
+
+    _B['bridgearchive'] = f"""    <!-- SECTION: GLOBAL PARTNERSHIP BRIDGE \u2014 FULL ARCHIVE PAGE (V174) -->
+    <div class="acct bdg-wrap" style="border-color:rgba(0,140,255,.4);margin:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+        <div class="sec-title" style="color:var(--hdr);margin:0"><span class="sic">\U0001F309</span> Global Partnership Bridge</div>
+        <div style="text-align:right"><div class="pl-counter">{bridge_total}+</div><div style="font-size:12px;color:var(--tx);font-family:var(--mn)">catalogued relationships</div></div>
       </div>
-      <div class="pl-stats">
-        <b id="pl-shown">{min(pl_total, 30)}</b> shown &nbsp;|&nbsp; <b>{pl_total}</b> total &nbsp;|&nbsp;
-        <span style="color:var(--gr)">{pl_detected} newly detected</span>
+      <div style="font-size:15px;color:var(--tx);line-height:1.7;font-family:system-ui;margin-bottom:14px">
+        Every publicly identifiable XRP, Ripple, and XRPL relationship we track \u2014 banks, exchanges, custodians,
+        governments, and enterprises \u2014 in one permanent, ever-growing archive. Newest deals sort to the top.
+        Nothing is ever erased: entries only accumulate. New deals detected from the live news feed are added here
+        automatically and permanently, alongside the {pl_total - pl_detected}-entry curated baseline.
       </div>
-      <div class="pl-list" id="pl-list">
-        {pl_html}
+      <div class="bdg-legend">
+        <span class="bdg-legend-item" style="color:var(--gr)">{PARTNERSHIP_ICON_SVG['XRP']} XRP <b>{bridge_xrp_n}</b></span>
+        <span class="bdg-legend-item" style="color:var(--bl)">{PARTNERSHIP_ICON_SVG['RIPPLE']} Ripple <b>{bridge_ripple_n}</b></span>
+        <span class="bdg-legend-item" style="color:var(--tq)">{PARTNERSHIP_ICON_SVG['XRPL']} XRPL <b>{bridge_xrpl_n}</b></span>
       </div>
-      <div style="margin-top:10px;font-size:12px;color:var(--tx);font-family:var(--mn);opacity:.7">
-        Baseline sources: Ripple.com partner listings, SEC filings, central bank announcements, verified corporate press
-        releases. New entries are detected from the live news feed. Directory is for informational purposes; some
-        partnerships may be pilots or historical integrations.
-      </div>
+      <div class="bdg-controls">
+        <input class="bdg-search" id="bdg-search" type="text" placeholder="\U0001F50D Search institution, country, category, relationship..." oninput="bdgFilter()">
+        <div class="bdg-cats" id="bdg-cats">
+          <button class="bdg-btn active" data-cat="ALL" onclick="bdgCat('ALL',this)">ALL</button>
+          <button class="bdg-btn" data-cat="XRP" style="color:var(--gr);border-color:var(--gr)" onclick="bdgCat('XRP',this)">\u25c6 XRP</button>
+          <button class="bdg-btn" data-cat="RIPPLE" style="color:var(--bl);border-color:var(--bl)" onclick="bdgCat('RIPPLE',this)">\u2248 Ripple</button>
+          <button class="bdg-btn" data-cat="XRPL" style="color:var(--tq);border-color:var(--tq)" onclick="bdgCat('XRPL',this)">\u25a4 XRPL</button>
+          <button class="bdg-btn" data-cat="NEW" style="color:var(--yl);border-color:var(--yl)" onclick="bdgCat('NEW',this)">\U0001F195 New Deals</button>
         </div>
-        <div class="sd-panel">
-          <div class="sd-head">
-            <span class="sd-title">\U0001F4D1 Global Partnership Directory</span>
-            <span class="sd-count">{sd_count}+</span>
-          </div>
-          <div class="sd-sub">Curated master list of confirmed global partnerships &amp; contracts. Refreshes every 3 days. Updated {sd_updated}.</div>
-          <div class="sd-list">
-            {sd_html}
-          </div>
-        </div>
+        <div class="bdg-stats"><b id="bdg-shown">{bridge_total}</b> shown &nbsp;|&nbsp; <b>{bridge_total}</b> total &nbsp;|&nbsp; <span style="color:var(--gr)">{pl_detected} newly detected</span></div>
+      </div>
+      <div class="bdg-scrollpanel" id="bdg-list">
+        {bridge_cards_html}
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--tx);font-family:var(--mn);opacity:.7">
+        Baseline sources: Ripple.com partner listings, SEC filings, central bank announcements, and verified corporate
+        press releases, compiled as of the master list's last update. New entries are detected from the live
+        news feed and stored permanently. This archive is for informational purposes; some relationships are pilots,
+        historical, or awaiting current re-verification as individually noted above.
+      </div>
+      <div class="bdg-export-bottom">
+        <button class="bdg-export" onclick="bdgExportArchive()">\U0001F4E5 Download Archive Backup (.json)</button>
+        <div class="bdg-export-note">Password-protected. Before your next redeploy: download this backup and include it (unchanged filename, <code>partnership_archive.json</code>) next to main.py in your zip \u2014 every entry, including anything auto-detected since your last deploy, is restored automatically on boot. No paid storage needed.</div>
       </div>
     </div>
 
@@ -16030,7 +16177,7 @@ def render_page(page="main"):
 
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystem', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['bridgearchive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -16402,6 +16549,54 @@ document.addEventListener('DOMContentLoaded', function() {{
       _applyPl();
     }}
 
+    // Global Partnership Bridge (full archive page) — search + XRP/Ripple/XRPL filter
+    var _bdgCat = 'ALL';
+    function _applyBdg() {{
+      var q = ((document.getElementById('bdg-search') || {{}}).value || '').toLowerCase().trim();
+      var cards = document.querySelectorAll('#bdg-list .bdg-card');
+      var shown = 0;
+      for (var i = 0; i < cards.length; i++) {{
+        var okCat = (_bdgCat === 'ALL') || (cards[i].getAttribute('data-cat') === _bdgCat);
+        var okQ = !q || (cards[i].getAttribute('data-text') || '').indexOf(q) !== -1;
+        var vis = okCat && okQ;
+        cards[i].style.display = vis ? '' : 'none';
+        if (vis) shown++;
+      }}
+      var sh = document.getElementById('bdg-shown'); if (sh) sh.textContent = shown;
+    }}
+    function bdgFilter() {{ _applyBdg(); }}
+    function bdgCat(cat, btn) {{
+      _bdgCat = cat;
+      var btns = document.querySelectorAll('#bdg-cats .bdg-btn');
+      for (var j = 0; j < btns.length; j++) btns[j].classList.remove('active');
+      if (btn) btn.classList.add('active');
+      _applyBdg();
+    }}
+
+    // Global Partnership Bridge — password-gated archive backup download
+    function bdgExportArchive() {{
+      var pw = window.prompt('Enter the export password to download the archive backup:');
+      if (pw === null) return;
+      fetch('/partnerships/export.json?pw=' + encodeURIComponent(pw))
+        .then(function (r) {{
+          if (r.status === 401) {{ alert('Incorrect password.'); return null; }}
+          if (!r.ok) {{ alert('Export failed — please try again.'); return null; }}
+          return r.blob();
+        }})
+        .then(function (blob) {{
+          if (!blob) return;
+          var url = window.URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'partnership_archive.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        }})
+        .catch(function () {{ alert('Export failed — please check your connection and try again.'); }});
+    }}
+
     // Next Briefing countdown (ticks live, hours/minutes)
     (function () {{
       var target = new Date("{brf_next_iso}").getTime();
@@ -16514,6 +16709,24 @@ def page_news():
 @app.route("/institutional")
 def page_institutional():
     return Response(replace_flags_with_svg(render_page("institutional")), mimetype="text/html")
+
+
+@app.route("/partnerships")
+def page_partnerships():
+    return Response(replace_flags_with_svg(render_page("partnerships")), mimetype="text/html")
+
+
+@app.route("/partnerships/export.json")
+def partnerships_export():
+    pw = request.args.get("pw", "")
+    if pw != PARTNERSHIP_EXPORT_PASSWORD:
+        return jsonify({"error": "Incorrect or missing password."}), 401
+    seed_partnership_ledger()
+    body = partnerships_export_json()
+    resp = Response(body, mimetype="application/json")
+    fname = f"partnership_archive.json"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{fname}"'
+    return resp
 
 
 @app.route("/regulatory")
