@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "173"
+APP_VERSION = "176"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -9716,7 +9716,7 @@ import sqlite3
 PARTNERSHIP_DB_PATH = os.environ.get("PARTNERSHIP_DB_PATH", "/data/partnerships.db")
 # Change this in Railway's Variables tab (Settings → Variables → add
 # PARTNERSHIP_EXPORT_PASSWORD) any time, without touching this file.
-PARTNERSHIP_EXPORT_PASSWORD = os.environ.get("PARTNERSHIP_EXPORT_PASSWORD", "redrio-bridge-2026")
+PARTNERSHIP_EXPORT_PASSWORD = os.environ.get("PARTNERSHIP_EXPORT_PASSWORD", "1682")
 
 def _pdb_connect():
     """Falls back to a local (non-persistent) file if /data isn't mounted yet,
@@ -9945,9 +9945,23 @@ def recent_partnerships_html(limit=12):
 
 
 PARTNERSHIP_ICON_SVG = {
-    "XRP": '<svg viewBox="0 0 24 24"><path d="M5 5l7 6-7 6M19 5l-7 6 7 6" stroke-width="2.2"/></svg>',
-    "RIPPLE": '<svg viewBox="0 0 24 24"><path d="M3 17c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/><path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/><path d="M3 7c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/></svg>',
-    "XRPL": '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 9.5h16M4 14.5h16M9.5 4v16M14.5 4v16"/></svg>',
+    # XRP \u2014 white hourglass/bowtie X mark, transparent background
+    "XRP": ('<svg viewBox="0 0 24 24" style="fill:none;stroke:#ffffff;stroke-width:3;'
+            'stroke-linecap:round;stroke-linejoin:round">'
+            '<path d="M4 5.5 10 11.5c1.1 1.1 2.9 1.1 4 0L20 5.5"/>'
+            '<path d="M4 18.5 10 12.5c1.1-1.1 2.9-1.1 4 0L20 18.5"/></svg>'),
+    # Ripple \u2014 blue three-lobed "jack" mark, transparent background
+    "RIPPLE": ('<svg viewBox="0 0 24 24" style="fill:#3a8fd9;stroke:none">'
+               '<circle cx="12" cy="6.4" r="3.3"/><circle cx="6.2" cy="16.3" r="3.3"/>'
+               '<circle cx="17.8" cy="16.3" r="3.3"/>'
+               '<path d="M12 9c-2 1.1-2.7 2.4-3 3.6-.4 1.7.9 2.5 3 1.5 2.1 1 3.4.2 3-1.5-.3-1.2-1-2.5-3-3.6z"/></svg>'),
+    # XRPL \u2014 white X inside curly brackets, transparent background
+    "XRPL": ('<svg viewBox="0 0 24 24" style="fill:none;stroke:#ffffff;stroke-width:1.7;'
+             'stroke-linecap:round;stroke-linejoin:round">'
+             '<path d="M7.5 4.2c-1.7 0-2.6.9-2.6 2.6v2.4c0 1.1-.8 1.8-1.7 1.8.9 0 1.7.7 1.7 1.8v2.4c0 1.7 1 2.6 2.6 2.6"/>'
+             '<path d="M16.5 4.2c1.7 0 2.6.9 2.6 2.6v2.4c0 1.1.8 1.8 1.7 1.8-.9 0-1.7.7-1.7 1.8v2.4c0 1.7-1 2.6-2.6 2.6"/>'
+             '<path d="M9.3 8.7 12 11.4c.4.4 1 .4 1.4 0l2.7-2.7" stroke-width="2.5"/>'
+             '<path d="M9.3 15.3 12 12.6c.4-.4 1-.4 1.4 0l2.7 2.7" stroke-width="2.5"/></svg>'),
     "NEW": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>',
 }
 
@@ -13784,16 +13798,12 @@ def render_page(page="main"):
   .bdg-legend-item{{ display:flex; align-items:center; gap:6px; }}
   .bdg-legend-item svg{{ width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }}
   .bdg-legend-item b{{ color:var(--br); font-size:15px; }}
-  .bdg-export-bottom{{ margin-top:18px; padding-top:16px; border-top:1px solid var(--b); text-align:center; }}
-  .bdg-export{{ padding:10px 20px; border-radius:8px; background:var(--gr); color:#08130a; border:none;
-    font-family:var(--mn); font-weight:800; font-size:13px; letter-spacing:.3px; cursor:pointer; }}
-  .bdg-export:hover{{ opacity:.88; }}
-  .bdg-export-note{{ font-size:12px; color:var(--tx); font-family:system-ui; line-height:1.6; margin:10px auto 0; max-width:560px; opacity:.85; }}
-  .bdg-export-note code{{ font-family:var(--mn); background:var(--s2); padding:1px 5px; border-radius:4px; }}
-  .bdg-export{{ margin-left:auto; padding:6px 14px; border-radius:7px; background:var(--gr); color:#08130a;
-    font-family:var(--mn); font-weight:800; font-size:12px; letter-spacing:.3px; text-decoration:none; }}
-  .bdg-export:hover{{ opacity:.88; }}
-  .bdg-export-note{{ font-size:12px; color:var(--tx); font-family:system-ui; line-height:1.5; margin:-6px 0 14px; opacity:.85; }}
+  .bdg-export-bottom{{ margin-top:16px; text-align:right; opacity:.55; }}
+  .bdg-export-bottom:hover{{ opacity:1; }}
+  .bdg-export{{ background:none; border:none; padding:0; color:var(--tx); font-family:var(--mn);
+    font-size:11px; letter-spacing:.2px; cursor:pointer; text-decoration:underline; text-decoration-style:dotted; }}
+  .bdg-export-note{{ font-size:10px; color:var(--tx); font-family:system-ui; line-height:1.4; margin-top:2px; }}
+  .bdg-export-note code{{ font-family:var(--mn); }}
   .bdg-controls{{ margin-bottom:10px; }}
   .bdg-search{{ width:100%; box-sizing:border-box; background:#e9ecf1; border:1px solid #c3c8d1; border-radius:8px;
     color:#1a2a4a; font-family:var(--mn); font-size:15px; padding:11px 14px; margin-bottom:10px; }}
@@ -14459,10 +14469,12 @@ def render_page(page="main"):
                          '<path d="M7 11h1.5M7 14h1.5M7 17h1.5"/>'
                          '<path d="M15.5 7h1.5M15.5 10h1.5M15.5 13h1.5M15.5 16h1.5"/>'
                          '<path d="M3 21h18"/></svg>',
-        "partnerships":  '<svg viewBox="0 0 24 24"><path d="M2 17c2.5-6 4.5-6 5.5-6s2 1 2 3-1 3-2 3-3-1-3-3"/>'
-                         '<path d="M22 17c-2.5-6-4.5-6-5.5-6s-2 1-2 3 1 3 2 3 3-1 3-3"/>'
-                         '<path d="M2 20h20M4 17V9M20 17V9M4 9l2-3M20 9l-2-3"/>'
-                         '<path d="M9.5 14h5"/></svg>',
+        "partnerships":  '<svg viewBox="0 0 24 24"><path d="M6.5 2h2M15.5 2h2"/>'
+                         '<path d="M7.5 2v15M16.5 2v15"/>'
+                         '<path d="M1 15C3 8 5.5 2 7.5 2 9.5 2 10.5 10 12 13 13.5 10 14.5 2 16.5 2 18.5 2 21 8 23 15"/>'
+                         '<path d="M3 11v6M5 5.5v11.5M9.5 8v9M11.5 12v5M12.5 12v5M14.5 8v9M19 5.5v11.5M21 11v6"/>'
+                         '<path d="M1 17h22"/><path d="M7.5 17v3M16.5 17v3"/>'
+                         '<path d="M5.5 20h4M14.5 20h4"/></svg>',
         "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 2v2"/>'
                          '<path d="M8.5 8.5a3.5 3.5 0 0 1 7 0"/><path d="M7.5 8.5h9"/>'
                          '<path d="M5.5 11.5h13"/><path d="M7 11.5v6.5M10.3 11.5v6.5M13.7 11.5v6.5M17 11.5v6.5"/>'
@@ -15497,8 +15509,8 @@ def render_page(page="main"):
         historical, or awaiting current re-verification as individually noted above.
       </div>
       <div class="bdg-export-bottom">
-        <button class="bdg-export" onclick="bdgExportArchive()">\U0001F4E5 Download Archive Backup (.json)</button>
-        <div class="bdg-export-note">Password-protected. Before your next redeploy: download this backup and include it (unchanged filename, <code>partnership_archive.json</code>) next to main.py in your zip \u2014 every entry, including anything auto-detected since your last deploy, is restored automatically on boot. No paid storage needed.</div>
+        <button class="bdg-export" onclick="bdgExportArchive()">Download archive backup (admin)</button>
+        <div class="bdg-export-note">Password required. Re-include the downloaded <code>partnership_archive.json</code> next to main.py on your next deploy to preserve auto-detected entries.</div>
       </div>
     </div>
 
