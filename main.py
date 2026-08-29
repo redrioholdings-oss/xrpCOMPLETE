@@ -12944,6 +12944,10 @@ def render_page(page="main"):
     sb_low = f'${MARKET["l24"]:.4f}' if MARKET.get("l24") else "\u2014"
     sb_feeds = f'{NEWS["feeds_active"]}/{NEWS["feeds_total"]}'
 
+    # Hero card (V177): new partnerships added in the trailing 7 days
+    _7d_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    new_partners_7d = sum(1 for e in PARTNERSHIP_LEDGER if e.get("date") and e["date"] >= _7d_cutoff)
+
     # Global Liquidity Tracker (V103) — computed from existing CoinPaprika data, no new calls
     liq_vol  = _fmt_usd(MARKET.get("vol24"))
     liq_mcap = _fmt_usd(MARKET.get("mcap"))
@@ -14393,6 +14397,11 @@ def render_page(page="main"):
   .hc-v{{ font-size:12.5px; color:#eaf2ff; font-weight:700; text-align:left;
          line-height:1.45; font-family:var(--mn); }}
   .hc-div{{ height:1px; background:rgba(130,160,200,.3); margin:16px 0; }}
+  /* V177: compact stacked key/value line for the header stats box (LIVE + 6 metrics) */
+  .hc-row2{{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; margin:8px 0; }}
+  .hc-row2 .hc-k{{ font-size:9px; letter-spacing:0.9px; color:var(--tx); font-weight:700; }}
+  .hc-row2 .hc-v{{ font-size:13px; color:#eaf2ff; font-weight:800; text-align:left;
+                  font-family:var(--mn); line-height:1.25; }}
   .hc-nb{{ font-size:12px; font-weight:800; letter-spacing:1.2px; color:#008CFF;
           margin-bottom:10px; }}
   .hc-nb-i{{ margin-right:4px; }}
@@ -14554,16 +14563,12 @@ def render_page(page="main"):
         </div>
         <div class="hero-card">
           <span class="hc-live"><span class="hc-live-dot"></span>LIVE</span>
-          <div class="hc-row"><span class="hc-k">BUILD</span><span class="hc-v">v{APP_VERSION}</span></div>
-          <div class="hc-row"><span class="hc-k">UPDATED</span><span class="hc-v">{BOOT_TIME.astimezone(CENTRAL).strftime('%B %d, %Y')}<br>{BOOT_TIME.astimezone(CENTRAL).strftime('%I:%M %p CT').lstrip('0')}</span></div>
-          <div class="hc-div"></div>
-          <div class="hc-nb"><span class="hc-nb-i">&#128337;</span> NEXT BRIEFING</div>
-          <div class="hc-cd">
-            <div class="hc-cell"><span class="hc-n" id="hb-h">--</span><span class="hc-u">HRS</span></div>
-            <div class="hc-cell"><span class="hc-n" id="hb-m">--</span><span class="hc-u">MIN</span></div>
-            <div class="hc-cell"><span class="hc-n" id="hb-s">--</span><span class="hc-u">SEC</span></div>
-          </div>
-          <a class="hc-brief" href="/#brief"><span>LATEST</span><span>BRIEF</span></a>
+          <div class="hc-row2"><span class="hc-k">XRP PRICE</span><span class="hc-v" style="color:{price_color}">{price_str}</span></div>
+          <div class="hc-row2"><span class="hc-k">24H CHANGE</span><span class="hc-v" style="color:{price_color}">{chg_str}</span></div>
+          <div class="hc-row2"><span class="hc-k">MARKET CAP</span><span class="hc-v">{sb_mcap}</span></div>
+          <div class="hc-row2"><span class="hc-k">LIQUIDITY</span><span class="hc-v" style="color:{liq_color}">{liq_rating}</span></div>
+          <div class="hc-row2"><span class="hc-k">FEAR &amp; GREED</span><span class="hc-v">{sb_fng} &middot; {sb_fng_lbl}</span></div>
+          <div class="hc-row2"><span class="hc-k">NEW PARTNERS (7D)</span><span class="hc-v" style="color:var(--gr)">+{new_partners_7d}</span></div>
         </div>
       </div>
     </div>
