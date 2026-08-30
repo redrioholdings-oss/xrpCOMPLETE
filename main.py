@@ -197,7 +197,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "178"
+APP_VERSION = "179"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -21776,8 +21776,11 @@ def render_page(page="main"):
         </div>
       </div>
     </div>
+  </div>
 
 {_nav}
+
+  <div class="w">
 """
 
     _B = {}
