@@ -5,6 +5,12 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V181 changes:
+  1. Thin solid explainer bar (--tq teal, same color as the hero ADVANCED
+     button) directly under the nav bar, ADVANCED page only. Conditional
+     on page=="advanced" in render_page(), so every other page is
+     byte-for-byte unaffected.
+
 V180 changes:
   1. New ADVANCED page (/advanced) — five institutional-grade metrics not
      shown elsewhere on the site. Not added to the main nav bar (menu
@@ -220,7 +226,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "180"
+APP_VERSION = "181"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -21717,6 +21723,10 @@ def render_page(page="main"):
   .hero-btnstack{{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; }}
   .hero-advbtn{{ color:var(--tq); border-color:var(--tq); }}
   .hero-advbtn:hover{{ background:rgba(0,229,204,.12); }}
+  /* V181: thin solid explainer bar under the nav, ADVANCED page only */
+  .adv-bar{{ background:var(--tq); color:#00110f; font-weight:800; font-size:13px;
+            letter-spacing:.3px; text-align:center; padding:9px 16px; }}
+  @media(max-width:640px){{ .adv-bar{{ font-size:11.5px; padding:8px 10px; }} }}
   /* V169: taller button, LATEST / BRIEF stacked, smaller font, no arrow */
   .hc-brief{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
              gap:2px; background:#008CFF; color:#fff;
@@ -21824,6 +21834,14 @@ def render_page(page="main"):
     # V173: working copy of the nav for the bottom of every page (non-sticky variant)
     _nav_bottom = _nav.replace('<nav class="xnav">', '<nav class="xnav xnav-bottom">', 1)
 
+    # V181: thin solid explainer bar, ADVANCED page only, directly under the nav bar
+    _adv_bar = (
+        '<div class="adv-bar">Advanced Institutional Metrics \u2014 derivatives positioning, '
+        'realized volatility, on-chain valuation, exchange supply, and tracked ETF/ETP AUM. '
+        'Not shown elsewhere on the site.</div>'
+        if page == "advanced" else ""
+    )
+
     _chrome = f"""<body id="top">
 
   <div class="w">
@@ -21885,7 +21903,7 @@ def render_page(page="main"):
   </div>
 
 {_nav}
-
+{_adv_bar}
   <div class="w">
 """
 
