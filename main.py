@@ -5,6 +5,11 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V182 changes:
+  1. ADVANCED button (hero) and the ADVANCED-page explainer bar recolored
+     from teal to corporate pink (#E0447C, the Red Rio brand pink already
+     used for the Meme Wall title) — button border/text and bar background.
+
 V181 changes:
   1. Thin solid explainer bar (--tq teal, same color as the hero ADVANCED
      button) directly under the nav bar, ADVANCED page only. Conditional
@@ -226,7 +231,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "181"
+APP_VERSION = "182"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -21721,10 +21726,10 @@ def render_page(page="main"):
   .hero-blogbtn{{ display:inline-block; width:216px; }}
   /* V180: stacks BLOG + ADVANCED vertically; ADVANCED styled as a quieter twin */
   .hero-btnstack{{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; }}
-  .hero-advbtn{{ color:var(--tq); border-color:var(--tq); }}
-  .hero-advbtn:hover{{ background:rgba(0,229,204,.12); }}
+  .hero-advbtn{{ color:#E0447C; border-color:#E0447C; }}
+  .hero-advbtn:hover{{ background:rgba(224,68,124,.12); }}
   /* V181: thin solid explainer bar under the nav, ADVANCED page only */
-  .adv-bar{{ background:var(--tq); color:#00110f; font-weight:800; font-size:13px;
+  .adv-bar{{ background:#E0447C; color:#1a0410; font-weight:800; font-size:13px;
             letter-spacing:.3px; text-align:center; padding:9px 16px; }}
   @media(max-width:640px){{ .adv-bar{{ font-size:11.5px; padding:8px 10px; }} }}
   /* V169: taller button, LATEST / BRIEF stacked, smaller font, no arrow */
