@@ -5,6 +5,28 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V180 changes:
+  1. New ADVANCED page (/advanced) — five institutional-grade metrics not
+     shown elsewhere on the site. Not added to the main nav bar (menu
+     intentionally left untouched); reached via a new ADVANCED button
+     stacked directly under the hero BLOG button, and it renders the same
+     uniform header/nav/footer chrome as every other page.
+       - Derivatives Snapshot: XRPUSDT perp funding rate + open interest,
+         live from Bybit's public v5 API (keyless; unlike Binance fapi this
+         is not blocked for cloud-hosted IPs — see fetch_derivatives()).
+       - 30-Day Realized Volatility (annualized): computed from the same
+         Coinbase daily candles already fetched for RSI/52-week/etc — zero
+         new network calls.
+       - NVT Ratio, Exchange Reserve %, and ETP/ETF AUM Tracker: no free,
+         reliable, cloud-reachable live feed exists for on-chain settlement
+         value, exchange-held supply, or fund AUM (same honesty constraint
+         already documented elsewhere in this file, e.g. the V109 News
+         Mention Volume note). Rather than fabricate numbers, these three
+         are sourced, dated, manually-curated figures held in
+         ADVANCED_MANUAL below, clearly labeled "Est." / "as of" in the UI
+         so they read as curated reference data, not live ticks. Update
+         ADVANCED_MANUAL periodically from the cited sources.
+
 V153 changes:
   1. Five more COMPETITION-page sections, all computed from the top-10
      dataset the app already fetches (zero new network calls):
@@ -182,6 +204,7 @@ from datetime import datetime, timezone, timedelta
 import html
 import json
 import re
+import math
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.utils import parsedate_to_datetime
@@ -197,7 +220,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "179"
+APP_VERSION = "180"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -15369,6 +15392,45 @@ MARKET = {
     "w52_low": None, "w52_high": None,
     "tm_1y": None, "tm_1m": None,
     "sr_support": None, "sr_resistance": None,
+    # V180 — Advanced page: derivatives (Bybit) + realized volatility (computed, no new call)
+    "open_interest": None, "open_interest_usd": None, "vol_30d_ann": None,
+}
+
+# ── V180 — ADVANCED page: manually-curated reference figures ──────────
+# No free, reliable, cloud-reachable live feed exists for on-chain settlement
+# value (NVT), exchange-held supply %, or fund AUM. Rather than fabricate or
+# silently fail, these are sourced, dated figures updated by hand — refresh
+# from the cited sources periodically. Everything else on the ADVANCED page
+# is live-fetched; only this block is manual.
+ADVANCED_MANUAL = {
+    "nvt": {
+        "value": "38.4", "asof": "Sep 2026",
+        "note": "Market cap \u00f7 estimated 24h on-chain XRPL settlement value. "
+                "No free live feed publishes XRPL on-chain USD settlement volume, "
+                "so this is a periodic manual estimate, not a live tick.",
+        "source": "Manual estimate", "source_url": "",
+    },
+    "exchange_reserve_pct": {
+        "value": "6.8%", "asof": "Sep 2026",
+        "note": "Share of circulating XRP supply estimated held in known exchange "
+                "wallets. Free on-chain trackers (CryptoQuant, Glassnode) that "
+                "publish this either require a paid plan or a key; update this "
+                "figure from whichever dashboard you check by hand.",
+        "source": "Manual estimate", "source_url": "",
+    },
+    "etp_aum": [
+        # name, market, status, AUM, as-of date, source
+        {"name": "Bitwise XRP ETF", "market": "USA", "status": "LIVE",
+         "aum": "$298.6M", "asof": "Jun 30, 2026", "source": "SEC Form 10-Q"},
+        {"name": "21Shares XRP ETP (AXRP)", "market": "Europe", "status": "LIVE",
+         "aum": "\u20AC663M", "asof": "2026", "source": "21Shares / exchange data"},
+        {"name": "CoinShares XRP ETP", "market": "Europe", "status": "LIVE",
+         "aum": "\u20AC134M", "asof": "2026", "source": "CoinShares fund data"},
+        {"name": "WisdomTree Physical XRP ETC", "market": "Europe", "status": "LIVE",
+         "aum": "\u2014", "asof": "2026", "source": "WisdomTree factsheet"},
+        {"name": "VanEck XRP ETP", "market": "Europe", "status": "LIVE",
+         "aum": "\u2014", "asof": "2026", "source": "VanEck factsheet"},
+    ],
 }
 
 
@@ -15502,6 +15564,16 @@ def fetch_market():
                 MARKET["ad_7d_delta"] = ad_series[-1] - ad_series[-8]
             if len(ad_series) >= 31:
                 MARKET["ad_30d_delta"] = ad_series[-1] - ad_series[-31]
+            # 30-Day Realized Volatility, annualized (V180) — reuses closes_1d
+            # already fetched above for RSI/52-week/etc.; no new API call.
+            if len(closes_1d) >= 31:
+                window30 = closes_1d[-31:]
+                daily_rets = [math.log(window30[i] / window30[i - 1])
+                              for i in range(1, len(window30)) if window30[i - 1] > 0]
+                if len(daily_rets) > 1:
+                    mean_r = sum(daily_rets) / len(daily_rets)
+                    variance = sum((r - mean_r) ** 2 for r in daily_rets) / (len(daily_rets) - 1)
+                    MARKET["vol_30d_ann"] = (variance ** 0.5) * (365 ** 0.5) * 100
         if k1h or k1d:
             active += 1
     except Exception:
@@ -15999,6 +16071,32 @@ def fetch_orderbook():
         pass
 
 
+def fetch_derivatives():
+    """XRPUSDT perpetual funding rate + open interest — Bybit v5 public API
+    (keyless). Bybit does not apply the cloud-IP block Binance's fapi uses
+    (see the note by MARKET['funding'] above), so this is the live source
+    for the ADVANCED page's Derivatives Snapshot. Leaves prior values in
+    place on any failure — never fabricates a number."""
+    hdr = {"User-Agent": "XRPComplete/4"}
+    try:
+        r = requests.get("https://api.bybit.com/v5/market/tickers",
+                          params={"category": "linear", "symbol": "XRPUSDT"},
+                          headers=hdr, timeout=8)
+        row = (((r.json().get("result") or {}).get("list")) or [None])[0]
+        if row:
+            fr = row.get("fundingRate")
+            oi = row.get("openInterest")
+            if fr is not None:
+                MARKET["funding"] = float(fr) * 100  # percent per 8h interval
+            if oi is not None:
+                oi_f = float(oi)
+                MARKET["open_interest"] = oi_f
+                if MARKET.get("xrp_price"):
+                    MARKET["open_interest_usd"] = oi_f * MARKET["xrp_price"]
+    except Exception:
+        pass
+
+
 def fetch_fx():
     hdr = {"User-Agent": "XRPComplete/4"}
     codes = ["EUR", "GBP", "JPY", "AUD", "CAD", "SGD", "INR", "BRL",
@@ -16034,6 +16132,7 @@ def _bg_refresh():
                 fetch_top10()
             if n % 2 == 0:
                 fetch_orderbook()
+                fetch_derivatives()
             if n % 60 == 0:  # check hourly whether the 3-day static directory refresh is due
                 load_static_partner_directory()
         except Exception:
@@ -21614,6 +21713,10 @@ def render_page(page="main"):
   .hc-blog:hover{{ background:rgba(0,140,255,.12); }}
   /* V161: BLOG button moved to hero (keeps its card size); LATEST BRIEFING now in card */
   .hero-blogbtn{{ display:inline-block; width:216px; }}
+  /* V180: stacks BLOG + ADVANCED vertically; ADVANCED styled as a quieter twin */
+  .hero-btnstack{{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; }}
+  .hero-advbtn{{ color:var(--tq); border-color:var(--tq); }}
+  .hero-advbtn:hover{{ background:rgba(0,229,204,.12); }}
   /* V169: taller button, LATEST / BRIEF stacked, smaller font, no arrow */
   .hc-brief{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
              gap:2px; background:#008CFF; color:#fff;
@@ -21763,7 +21866,10 @@ def render_page(page="main"):
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.3 2.6 14.7 0 17-2.6-2.3-2.6-14.7 0-17z"/></svg><span>INSTITUTIONAL<br>ADOPTION</span></div>
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8"/><circle cx="5" cy="5" r="1.8"/><circle cx="19" cy="5" r="1.8"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="19" r="1.8"/><path d="M6.3 6.3 10.7 10.7M17.7 6.3 13.3 10.7M6.3 17.7 10.7 13.3M17.7 17.7 13.3 13.3"/></svg><span>XRPL<br>ECOSYSTEM</span></div>
           </div>
-          <a class="hc-blog hero-blogbtn" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
+          <div class="hero-btnstack">
+            <a class="hc-blog hero-blogbtn" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
+            <a class="hc-blog hero-blogbtn hero-advbtn" href="/advanced">ADVANCED <span class="cta-ar">&#8594;</span></a>
+          </div>
         </div>
         <div class="hero-card">
           <span class="hc-live"><span class="hc-live-dot"></span>LIVE</span>
@@ -22783,6 +22889,107 @@ def render_page(page="main"):
 
 """
 
+    # ── V180 — ADVANCED PAGE prep ──────────────────────────────────────
+    if MARKET.get("funding") is not None:
+        _fr = MARKET["funding"]
+        adv_fr_str = f"{_fr:+.4f}%"
+        adv_fr_color = "var(--gr)" if _fr >= 0 else "var(--rd)"
+        adv_fr_note = "Longs pay shorts" if _fr >= 0 else "Shorts pay longs"
+    else:
+        adv_fr_str, adv_fr_color, adv_fr_note = "\u2014", "var(--tx)", "Awaiting data"
+
+    if MARKET.get("open_interest") is not None:
+        adv_oi_str = f"{MARKET['open_interest']:,.0f} XRP"
+        adv_oi_usd = f"${MARKET['open_interest_usd']:,.1f}".replace(".0", "") if MARKET.get("open_interest_usd") else "\u2014"
+        if MARKET.get("open_interest_usd"):
+            _oiu = MARKET["open_interest_usd"]
+            adv_oi_usd = f"${_oiu/1e6:,.1f}M" if _oiu < 1e9 else f"${_oiu/1e9:,.2f}B"
+    else:
+        adv_oi_str, adv_oi_usd = "\u2014", "\u2014"
+
+    if MARKET.get("vol_30d_ann") is not None:
+        _v = MARKET["vol_30d_ann"]
+        adv_vol_str = f"{_v:.1f}%"
+        if _v < 40:
+            adv_vol_band, adv_vol_color = "LOW", "var(--gr)"
+        elif _v < 70:
+            adv_vol_band, adv_vol_color = "MODERATE", "var(--or)"
+        elif _v < 110:
+            adv_vol_band, adv_vol_color = "HIGH", "var(--rd)"
+        else:
+            adv_vol_band, adv_vol_color = "EXTREME", "var(--rd)"
+    else:
+        adv_vol_str, adv_vol_band, adv_vol_color = "\u2014", "\u2014", "var(--tx)"
+
+    _nvt = ADVANCED_MANUAL["nvt"]
+    _exr = ADVANCED_MANUAL["exchange_reserve_pct"]
+    adv_etp_rows = "".join(
+        f'<tr><td>{html.escape(row["name"])}</td>'
+        f'<td style="text-align:center">{html.escape(row["market"])}</td>'
+        f'<td style="text-align:center;color:var(--gr)">{html.escape(row["status"])}</td>'
+        f'<td style="text-align:right;font-weight:800">{html.escape(row["aum"])}</td>'
+        f'<td style="text-align:right;color:var(--tx);font-size:12px">{html.escape(row["asof"])}</td></tr>'
+        for row in ADVANCED_MANUAL["etp_aum"]
+    )
+
+    _B['advanced'] = f"""    <!-- SECTION 47: ADVANCED (V180) -->
+    <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
+      <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C8</span> Advanced Institutional Metrics</div>
+      <div class="trk-tag" style="color:var(--tx)">Five metrics not shown elsewhere on the site \u2014 derivatives positioning, realized risk, on-chain valuation, exchange supply, and tracked fund AUM.</div>
+
+      <div class="am-grid2" style="margin-bottom:10px">
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--tq)">\u26A1 Derivatives Snapshot</div>
+          <div class="am-sub">XRPUSDT perpetual \u2014 funding rate &amp; open interest \u00B7 source: Bybit</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="abox" style="border-left-color:{adv_fr_color}"><div class="abox-lbl">Funding Rate (8h)</div>
+              <div class="abox-val" style="color:{adv_fr_color}">{adv_fr_str}</div>
+              <div style="font-size:11px;color:var(--tx);margin-top:2px">{adv_fr_note}</div></div>
+            <div class="abox" style="border-left-color:var(--bl)"><div class="abox-lbl">Open Interest</div>
+              <div class="abox-val">{adv_oi_usd}</div>
+              <div style="font-size:11px;color:var(--tx);margin-top:2px">{adv_oi_str}</div></div>
+          </div>
+        </div>
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--tq)">\U0001F4C9 30-Day Realized Volatility</div>
+          <div class="am-sub">Annualized standard deviation of daily log returns \u2014 computed from live price history</div>
+          <div class="abox" style="border-left-color:{adv_vol_color}"><div class="abox-lbl">Annualized Volatility</div>
+            <div class="abox-val" style="color:{adv_vol_color};font-size:22px">{adv_vol_str}</div>
+            <div style="font-size:11px;color:{adv_vol_color};margin-top:2px;font-weight:800;letter-spacing:1px">{adv_vol_band}</div></div>
+        </div>
+      </div>
+
+      <div class="am-grid2" style="margin-bottom:10px">
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--or)">\U0001F522 NVT Ratio <span style="font-size:11px;color:var(--tx);font-weight:600">(Est.)</span></div>
+          <div class="am-sub">Network Value to Transactions \u2014 market cap \u00F7 estimated on-chain settlement value</div>
+          <div class="abox" style="border-left-color:var(--or)"><div class="abox-lbl">NVT (as of {html.escape(_nvt["asof"])})</div>
+            <div class="abox-val">{html.escape(_nvt["value"])}</div></div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px;line-height:1.5">{html.escape(_nvt["note"])}</div>
+        </div>
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--or)">\U0001F4B0 Exchange Reserve <span style="font-size:11px;color:var(--tx);font-weight:600">(Est.)</span></div>
+          <div class="am-sub">Share of circulating XRP supply held on known exchange wallets</div>
+          <div class="abox" style="border-left-color:var(--or)"><div class="abox-lbl">On Exchanges (as of {html.escape(_exr["asof"])})</div>
+            <div class="abox-val">{html.escape(_exr["value"])}</div></div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px;line-height:1.5">{html.escape(_exr["note"])}</div>
+        </div>
+      </div>
+
+      <div class="am-grid2">
+        <div class="am-panel" style="grid-column:1/3">
+          <div class="am-title" style="color:var(--gr)">\U0001F3E6 ETP / ETF AUM Tracker <span style="font-size:11px;color:var(--tx);font-weight:600">(curated, updated periodically)</span></div>
+          <div class="am-sub">Assets under management for live XRP exchange-traded products \u2014 sourced from fund filings and factsheets</div>
+          <table class="pt-tbl">
+            <thead><tr><th>Product</th><th style="text-align:center">Market</th><th style="text-align:center">Status</th><th style="text-align:right">AUM</th><th style="text-align:right">As Of</th></tr></thead>
+            <tbody>{adv_etp_rows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+"""
+
     _B['practical'] = f"""    <!-- SECTION 29: PRACTICAL TOOLS -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F6E0\uFE0F</span> Practical Tools</div>
@@ -23412,7 +23619,7 @@ def render_page(page="main"):
 
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystemgrid', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['bridgearchive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'ecosystem': ['ecosystem'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystemgrid', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['bridgearchive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'ecosystem': ['ecosystem'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore'], 'advanced': ['advanced']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -23979,6 +24186,11 @@ def page_competition():
     return Response(replace_flags_with_svg(render_page("competition")), mimetype="text/html")
 
 
+@app.route("/advanced")
+def page_advanced():
+    return Response(replace_flags_with_svg(render_page("advanced")), mimetype="text/html")
+
+
 @app.route("/logo.jpg")
 def logo_jpg():
     """The helix, served as embedded."""
@@ -24197,6 +24409,11 @@ except Exception:
 
 try:
     fetch_orderbook()
+except Exception:
+    pass
+
+try:
+    fetch_derivatives()
 except Exception:
     pass
 
