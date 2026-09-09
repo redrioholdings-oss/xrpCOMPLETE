@@ -16083,12 +16083,42 @@ def fetch_orderbook():
 
 
 def fetch_derivatives():
-    """XRPUSDT perpetual funding rate + open interest — Bybit v5 public API
-    (keyless). Bybit does not apply the cloud-IP block Binance's fapi uses
-    (see the note by MARKET['funding'] above), so this is the live source
-    for the ADVANCED page's Derivatives Snapshot. Leaves prior values in
-    place on any failure — never fabricates a number."""
+    """XRPUSDT perpetual funding rate + open interest.
+    V183: OKX added as the primary source. Bybit's public API returns a 403
+    for any US- or mainland-China-based IP (confirmed in Bybit's own API
+    guide) \u2014 and that's exactly where Railway's servers run, so the
+    original Bybit-only version never populated a single value here, ever.
+    OKX's public market-data endpoints carry no such restriction. Bybit is
+    kept as a fallback only, in case that ever changes. Leaves prior values
+    in place on any failure \u2014 never fabricates a number."""
     hdr = {"User-Agent": "XRPComplete/4"}
+
+    # Primary: OKX public API (keyless; no confirmed US/mainland-China or
+    # cloud-IP block on its public market-data endpoints)
+    try:
+        r1 = requests.get("https://www.okx.com/api/v5/public/funding-rate",
+                           params={"instId": "XRP-USDT-SWAP"}, headers=hdr, timeout=8)
+        d1 = ((r1.json().get("data")) or [None])[0]
+        r2 = requests.get("https://www.okx.com/api/v5/public/open-interest",
+                           params={"instType": "SWAP", "instId": "XRP-USDT-SWAP"}, headers=hdr, timeout=8)
+        d2 = ((r2.json().get("data")) or [None])[0]
+        got_any = False
+        if d1 and d1.get("fundingRate") is not None:
+            MARKET["funding"] = float(d1["fundingRate"]) * 100  # percent per interval
+            got_any = True
+        if d2 and d2.get("oiCcy") is not None:
+            oi_f = float(d2["oiCcy"])
+            MARKET["open_interest"] = oi_f
+            if MARKET.get("xrp_price"):
+                MARKET["open_interest_usd"] = oi_f * MARKET["xrp_price"]
+            got_any = True
+        if got_any:
+            return  # OKX satisfied the request \u2014 skip the Bybit fallback
+    except Exception:
+        pass
+
+    # Fallback: Bybit v5 public API \u2014 blocked for US / mainland-China IPs
+    # per Bybit's own docs, kept only in case that restriction changes.
     try:
         r = requests.get("https://api.bybit.com/v5/market/tickers",
                           params={"category": "linear", "symbol": "XRPUSDT"},
