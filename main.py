@@ -17062,14 +17062,14 @@ def _pdb_seed_master():
         conn.commit()
     conn.close()
 
-def _pdb_insert_detected(key, name, benefit, link, dt):
+def _pdb_insert_detected(key, name, benefit, link, dt, cat="RIPPLE"):
     conn = _pdb_init()
     conn.execute(
         "INSERT OR IGNORE INTO partnerships "
         "(key,name,flag,country,relationship,status,date_str,evidence,industry,xcat,benefit,source,link,added_at) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (key, name, "\U0001F195", None, benefit, "NEW", dt.strftime("%Y-%m-%d"), "Live feed",
-         "Auto-Detected", "NEW", benefit, "detected", link, dt.isoformat())
+         "Auto-Detected", cat, benefit, "detected", link, dt.isoformat())
     )
     conn.commit()
     conn.close()
@@ -17189,6 +17189,21 @@ _PARTNERSHIP_DEAL_KW = ["partner", "partnership", "collaborat", "agreement", "si
                         "integrat", "teams up", "merger", "acquisition", "acquires", "deal with",
                         "onboards", "adopts xrp", "adopts ripple"]
 
+def _classify_partnership_cat(text):
+    """Buckets an auto-detected deal into XRP / RIPPLE / XRPL so it counts
+    toward the real category badges and filters \u2014 instead of the old
+    blanket 'NEW' bucket, which silently excluded every auto-detected deal
+    from the XRP/Ripple/XRPL totals shown on the Bridge page. Checked most
+    -> least specific since 'xrpl' contains 'xrp' as a substring."""
+    t = text.lower()
+    if "xrpl" in t:
+        return "XRPL"
+    if "ripple" in t:
+        return "RIPPLE"
+    if "xrp" in t:
+        return "XRP"
+    return "RIPPLE"
+
 def seed_partnership_ledger():
     global _PARTNERSHIP_SEEDED, PARTNERSHIP_LEDGER, _PARTNERSHIP_SEEN_KEYS
     if _PARTNERSHIP_SEEDED:
@@ -17211,10 +17226,11 @@ def _detect_partnership_deals(pool):
             continue
         _PARTNERSHIP_SEEN_KEYS.add(key)
         benefit = s.get("summary", "") or f"Detected via live monitoring from {s['source']} \u2014 full write-up pending manual review."
-        _pdb_insert_detected(key, s["title"], benefit, s.get("link"), s["dt"])
+        cat = _classify_partnership_cat(text)
+        _pdb_insert_detected(key, s["title"], benefit, s.get("link"), s["dt"], cat)
         PARTNERSHIP_LEDGER.append({
             "key": key, "name": s["title"], "flag": "\U0001F195", "country": None, "country_name": None,
-            "cat": "NEW", "status": "NEW", "detail": benefit, "relationship": benefit,
+            "cat": cat, "status": "NEW", "detail": benefit, "relationship": benefit,
             "benefit": benefit, "date_str": s["dt"].strftime("%Y-%m-%d"), "evidence": "Live feed",
             "industry": "Auto-Detected", "date": s["dt"], "source": "detected", "link": s.get("link"),
         })
@@ -17289,7 +17305,7 @@ def partnerships_bridge_html():
         is_new = e["source"] == "detected"
         search_blob = html.escape((e["name"] + " " + country_name + " " + (e.get("relationship") or "") + " " + e["cat"]).lower(), quote=True)
         cards += (
-            f'<div class="bdg-card" data-cat="{e["cat"]}" data-text="{search_blob}">'
+            f'<div class="bdg-card" data-cat="{e["cat"]}" data-new="{"1" if is_new else "0"}" data-text="{search_blob}">'
             f'<div class="bdg-top">'
             f'<span class="bdg-icon" style="color:{col}">{icon}</span>'
             f'<span class="bdg-catlabel" style="color:{col}">{ENTERPRISE_CATEGORY_LABELS.get(e["cat"], e["cat"])}</span>'
@@ -24021,7 +24037,7 @@ document.addEventListener('DOMContentLoaded', function() {{
       var cards = document.querySelectorAll('#bdg-list .bdg-card');
       var shown = 0;
       for (var i = 0; i < cards.length; i++) {{
-        var okCat = (_bdgCat === 'ALL') || (cards[i].getAttribute('data-cat') === _bdgCat);
+        var okCat = (_bdgCat === 'ALL') || (_bdgCat === 'NEW' ? cards[i].getAttribute('data-new') === '1' : cards[i].getAttribute('data-cat') === _bdgCat);
         var okQ = !q || (cards[i].getAttribute('data-text') || '').indexOf(q) !== -1;
         var vis = okCat && okQ;
         cards[i].style.display = vis ? '' : 'none';
