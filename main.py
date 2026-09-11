@@ -15448,15 +15448,13 @@ MARKET = {
 # below) — every card on the ADVANCED page is now a live tick, nothing
 # manual to keep updated by hand.
 
-def next_escrow_release():
-    """Ripple's XRP escrow releases on the 1st of each month. Pure date
-    math \u2014 no network call, always accurate, nothing to keep updated."""
-    now = datetime.now(timezone.utc)
-    if now.month == 12:
-        nxt = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
-    else:
-        nxt = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
-    delta = nxt - now
+def next_escrow_countdown():
+    """Days/hours to Ripple's next monthly XRP escrow release (1st of the
+    month UTC). Reuses next_escrow_release() (defined further down, already
+    powering the main page's Ecosystem cards) for the release date itself,
+    just adds the countdown split \u2014 no network call, always accurate."""
+    nxt = next_escrow_release()
+    delta = nxt - datetime.now(timezone.utc)
     return nxt, delta.days, delta.seconds // 3600
 
 def nvt_live():
@@ -16196,8 +16194,9 @@ def fetch_xrpl_network():
             info = r.json()["result"]["info"]
             vl = info["validated_ledger"]
             seq = int(vl["seq"])
-            load_factor = info.get("load_factor", 256)
-            load_base = info.get("load_base", 256)
+            # server_info's load_factor is already a normalized multiplier
+            # (1.0 = normal load); no load_base division needed here.
+            load_factor = info.get("load_factor", 1.0)
 
             r2 = requests.post(node, json={"method": "ledger",
                 "params": [{"ledger_index": seq, "transactions": True}]}, headers=hdr, timeout=8)
@@ -16215,7 +16214,7 @@ def fetch_xrpl_network():
             MARKET["xrpl_close_interval"] = (close_time - close_prev) if (close_time and close_prev) else None
             MARKET["xrpl_base_fee"] = vl.get("base_fee_xrp")
             MARKET["xrpl_reserve_base"] = vl.get("reserve_base_xrp")
-            MARKET["xrpl_load_pct"] = (load_factor / load_base * 100) if load_base else None
+            MARKET["xrpl_load_pct"] = float(load_factor)
             return  # first node that answers wins
         except Exception:
             continue
@@ -23137,14 +23136,14 @@ def render_page(page="main"):
         adv_xrpl_tx = f"{MARKET['xrpl_tx_count']:,}" if MARKET.get("xrpl_tx_count") is not None else "\u2014"
         adv_xrpl_fee = f"{MARKET['xrpl_base_fee']} XRP" if MARKET.get("xrpl_base_fee") is not None else "\u2014"
         _lp = MARKET.get("xrpl_load_pct")
-        adv_xrpl_load = f"{_lp:.0f}%" if _lp is not None else "\u2014"
-        adv_xrpl_load_color = "var(--gr)" if (_lp is None or _lp <= 110) else "var(--or)" if _lp <= 200 else "var(--rd)"
+        adv_xrpl_load = f"{_lp:.2f}\u00d7" if _lp is not None else "\u2014"
+        adv_xrpl_load_color = "var(--gr)" if (_lp is None or _lp <= 1.2) else "var(--or)" if _lp <= 3 else "var(--rd)"
     else:
         adv_xrpl_seq = adv_xrpl_interval = adv_xrpl_tx = adv_xrpl_fee = adv_xrpl_load = "\u2014"
         adv_xrpl_load_color = "var(--tx)"
 
-    _esc_dt, _esc_days, _esc_hrs = next_escrow_release()
-    adv_esc_date = _esc_dt.strftime("%b %-d, %Y") if hasattr(_esc_dt, "strftime") else str(_esc_dt)
+    _esc_dt, _esc_days, _esc_hrs = next_escrow_countdown()
+    adv_esc_date = f"{_esc_dt.strftime('%b')} {_esc_dt.day}, {_esc_dt.year}"
     adv_esc_countdown = f"{_esc_days}d {_esc_hrs}h"
 
     _obids = MARKET.get("ob_bids") or []
@@ -23218,7 +23217,7 @@ def render_page(page="main"):
             <div class="abox"><div class="abox-lbl">Txns in Ledger</div><div class="abox-val" style="font-size:15px">{adv_xrpl_tx}</div></div>
             <div class="abox" style="border-left-color:{adv_xrpl_load_color}"><div class="abox-lbl">Network Load</div><div class="abox-val" style="font-size:15px;color:{adv_xrpl_load_color}">{adv_xrpl_load}</div></div>
           </div>
-          <div style="font-size:11px;color:var(--tx);margin-top:8px">Base fee: {adv_xrpl_fee} \u00B7 100% load = normal, no queuing</div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px">Base fee: {adv_xrpl_fee} \u00B7 1.00\u00D7 load = normal, no queuing</div>
         </div>
         <div class="am-panel">
           <div class="am-title" style="color:var(--tq)">\u23F3 Escrow Countdown</div>
