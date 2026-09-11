@@ -17977,7 +17977,7 @@ def proprietary_feed_html(limit=8):
 #    "added": "2026-07-26", "b64": "<base64 png/jpg>"}
 # Newest-first ordering is by list position (append new ones at the top).
 MEMES = [
-    {"id": "bridge_skyline", "caption": "The bridge currency, rendered as an actual bridge.", "credit": None, "added": "2026-09-11",
+    {"id": "bridge_skyline", "caption": "", "credit": None, "added": "2026-09-11",
      "b64": (
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0d"
         "Hx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4e"
@@ -23345,7 +23345,7 @@ MEMES = [
         "UBEKx3+nNFYcjB5r6vq9VpLGmHqa1xD0GQlSQmpb20I5Gc19X1awOZjsMQNPZSrJAoPIjAHkV9X1L6lFYcxnT2Mp4nsVG01OLSHE"
         "EKFfV9XltVWo6T2OjcsvMC3SEACQKXJqVNkjtX1fVjXAYjJ6wXJcODio6JKknFfV9Xnr/tR2s8T/2Q=="
      )},
-    {"id": "xrp_bull", "caption": "XRP bull, off the leash.", "credit": None, "added": "2026-09-11",
+    {"id": "xrp_bull", "caption": "", "credit": None, "added": "2026-09-11",
      "b64": (
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0d"
         "Hx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4e"
@@ -28496,7 +28496,7 @@ MEMES = [
         "9QexHoa6jY6nBrOnx38C7EmBOzOdjDhkP0Pb1BBoUK3Uupmxyd0UmqqRdxkdhuzUC4796FCtESqfUgysQ2RUDVLdLmHHZhyp9DQo"
         "VanRRJWqZ//Z"
      )},
-    {"id": "waiting_on_xrp", "caption": "A community classic.", "credit": None, "added": "2026-09-11",
+    {"id": "waiting_on_xrp", "caption": "", "credit": None, "added": "2026-09-11",
      "b64": (
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0d"
         "Hx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4e"
@@ -29017,7 +29017,7 @@ MEMES = [
         "hQDp02Y9e7dMkMX4WMIuymtChQAoUKFAChQoUAKFChQAoUKFAChQoUAKFChQAoUKFAChQoUAKFChQApyUqUaOyOcpxKH7gEztx/6"
         "qbUKAFChQoAUKFCgBQoUKAFChQoAUKFCgBQoUKA//9k="
      )},
-    {"id": "fiat_exit", "caption": "Fiat rides out on horseback. XRP rides in on something faster.", "credit": None, "added": "2026-09-11",
+    {"id": "fiat_exit", "caption": "", "credit": None, "added": "2026-09-11",
      "b64": (
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0d"
         "Hx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4e"
@@ -35712,7 +35712,7 @@ MEMES = [
         "7Ab7AkF5hFSwVMhMJexsFJsL+ZwEkFOIWKwLzCbXO9vXH2PsBdBYQsP/AAiylvFfSx72/viRqmWMKQVLDoCLD/w4+x9iEQpzXPKj"
         "WEjTlzhrFlc6bG+1sfY+x9jRHHGuiuUnZ//Z"
      )},
-    {"id": "f1_livery", "caption": "Ripple x XRP, race livery concept.", "credit": None, "added": "2026-09-11",
+    {"id": "f1_livery", "caption": "", "credit": None, "added": "2026-09-11",
      "b64": (
         "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0d"
         "Hx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4e"
