@@ -5,6 +5,33 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V185 changes:
+  1. ADVANCED page redesign — retired the three manually-curated cards
+     (NVT estimate, Exchange Reserve estimate, ETP/ETF AUM table) and
+     replaced them with metrics computed entirely from live data. Page
+     is now eight live cards, nothing hand-updated:
+       - NVT Ratio (Live): market cap \u00f7 24h exchange-reported volume
+         (both already live-fetched in fetch_market()) as a transacted-
+         volume proxy for true on-chain NVT, which no free feed publishes.
+       - Long/Short Ratio: OKX top-trader account positioning for XRP
+         perpetuals \u2014 same keyless OKX host already proven reliable
+         from Railway by fetch_derivatives() (see V183).
+       - XRPL Network Health: validated ledger index, ledger close
+         interval, transactions in the latest ledger, base fee, and
+         network load \u2014 straight from a public XRPL JSON-RPC node
+         (xrplcluster.com, falling back to Ripple's own s1/s2 nodes).
+       - Escrow Countdown: days/hours to Ripple's next monthly XRP
+         escrow release. Pure date math, no network call \u2014 always
+         accurate, nothing to keep updated.
+       - Order Book Spread: best bid/ask and spread on XRP/USD, reusing
+         the Coinbase order-book data fetch_orderbook() already pulls
+         for the Markets page \u2014 zero new network calls.
+       - XRPL DEX Spread: best bid/ask on the native on-ledger XRP/RLUSD
+         market via XRPL's book_offers \u2014 the only card here with no
+         exchange middleman at all.
+     Derivatives Snapshot and 30-Day Realized Volatility are unchanged
+     and stay live as before.
+
 V182 changes:
   1. ADVANCED button (hero) and the ADVANCED-page explainer bar recolored
      from teal to corporate pink (#E0447C, the Red Rio brand pink already
@@ -15405,44 +15432,42 @@ MARKET = {
     "sr_support": None, "sr_resistance": None,
     # V180 — Advanced page: derivatives (Bybit) + realized volatility (computed, no new call)
     "open_interest": None, "open_interest_usd": None, "vol_30d_ann": None,
+    # V185 — Advanced page redesign: all-live metrics
+    "ls_ratio": None, "ls_ratio_ts": None,  # OKX top-trader long/short account ratio
+    "xrpl_ledger_seq": None, "xrpl_close_interval": None, "xrpl_tx_count": None,
+    "xrpl_base_fee": None, "xrpl_reserve_base": None, "xrpl_load_pct": None,
+    "xrpl_dex_bid": None, "xrpl_dex_ask": None, "xrpl_dex_spread_pct": None,
 }
 
-# ── V180 — ADVANCED page: manually-curated reference figures ──────────
-# No free, reliable, cloud-reachable live feed exists for on-chain settlement
-# value (NVT), exchange-held supply %, or fund AUM. Rather than fabricate or
-# silently fail, these are sourced, dated figures updated by hand — refresh
-# from the cited sources periodically. Everything else on the ADVANCED page
-# is live-fetched; only this block is manual.
-ADVANCED_MANUAL = {
-    "nvt": {
-        "value": "38.4", "asof": "Sep 2026",
-        "note": "Market cap \u00f7 estimated 24h on-chain XRPL settlement value. "
-                "No free live feed publishes XRPL on-chain USD settlement volume, "
-                "so this is a periodic manual estimate, not a live tick.",
-        "source": "Manual estimate", "source_url": "",
-    },
-    "exchange_reserve_pct": {
-        "value": "6.8%", "asof": "Sep 2026",
-        "note": "Share of circulating XRP supply estimated held in known exchange "
-                "wallets. Free on-chain trackers (CryptoQuant, Glassnode) that "
-                "publish this either require a paid plan or a key; update this "
-                "figure from whichever dashboard you check by hand.",
-        "source": "Manual estimate", "source_url": "",
-    },
-    "etp_aum": [
-        # name, market, status, AUM, as-of date, source
-        {"name": "Bitwise XRP ETF", "market": "USA", "status": "LIVE",
-         "aum": "$298.6M", "asof": "Jun 30, 2026", "source": "SEC Form 10-Q"},
-        {"name": "21Shares XRP ETP (AXRP)", "market": "Europe", "status": "LIVE",
-         "aum": "\u20AC663M", "asof": "2026", "source": "21Shares / exchange data"},
-        {"name": "CoinShares XRP ETP", "market": "Europe", "status": "LIVE",
-         "aum": "\u20AC134M", "asof": "2026", "source": "CoinShares fund data"},
-        {"name": "WisdomTree Physical XRP ETC", "market": "Europe", "status": "LIVE",
-         "aum": "\u2014", "asof": "2026", "source": "WisdomTree factsheet"},
-        {"name": "VanEck XRP ETP", "market": "Europe", "status": "LIVE",
-         "aum": "\u2014", "asof": "2026", "source": "VanEck factsheet"},
-    ],
-}
+# ── V185 — ADVANCED page redesign: manual reference block retired ─────
+# The prior NVT / Exchange Reserve / ETP AUM figures below were periodic
+# hand-updated estimates because no free feed published true on-chain
+# settlement value, exchange-held supply, or fund AUM. V185 drops all
+# three and replaces them with metrics computed entirely from data this
+# app already fetches live (see nvt_live() and the new fetch_* functions
+# below) — every card on the ADVANCED page is now a live tick, nothing
+# manual to keep updated by hand.
+
+def next_escrow_release():
+    """Ripple's XRP escrow releases on the 1st of each month. Pure date
+    math \u2014 no network call, always accurate, nothing to keep updated."""
+    now = datetime.now(timezone.utc)
+    if now.month == 12:
+        nxt = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        nxt = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+    delta = nxt - now
+    return nxt, delta.days, delta.seconds // 3600
+
+def nvt_live():
+    """NVT using 24h exchange-reported volume as the transaction-value
+    proxy (mcap and vol24 are both already live-fetched in fetch_market;
+    no new call). Common substitute for true on-chain settlement value
+    when that isn't freely available \u2014 clearly labeled as such in the UI."""
+    mcap, vol = MARKET.get("mcap"), MARKET.get("vol24")
+    if mcap and vol:
+        return mcap / vol
+    return None
 
 
 def calc_rsi(closes, period=14):
@@ -16138,6 +16163,108 @@ def fetch_derivatives():
         pass
 
 
+def fetch_long_short_ratio():
+    """OKX top-trader long/short account ratio for XRP perpetuals \u2014
+    keyless, public. Same OKX host already used successfully by
+    fetch_derivatives() (Bybit is blocked for Railway's US-range IPs;
+    OKX is not)."""
+    hdr = {"User-Agent": "XRPComplete/4"}
+    try:
+        r = requests.get("https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract",
+                          params={"ccy": "XRP", "period": "5m"}, headers=hdr, timeout=8)
+        data = r.json().get("data") or []
+        if data:
+            row = max(data, key=lambda x: int(x[0]))  # most recent by timestamp
+            MARKET["ls_ratio"] = float(row[1])
+            MARKET["ls_ratio_ts"] = int(row[0])
+    except Exception:
+        pass
+
+
+# Public XRPL full-history nodes \u2014 keyless JSON-RPC, tried in order.
+_XRPL_NODES = ["https://xrplcluster.com", "https://s1.ripple.com:51234", "https://s2.ripple.com:51234"]
+
+def fetch_xrpl_network():
+    """XRPL ledger health \u2014 validated ledger index, close interval,
+    transactions in the latest ledger, base fee, and network load.
+    Tries each public node in turn; leaves prior values in place if all
+    fail, never fabricates a number."""
+    hdr = {"User-Agent": "XRPComplete/4", "Content-Type": "application/json"}
+    for node in _XRPL_NODES:
+        try:
+            r = requests.post(node, json={"method": "server_info", "params": [{}]}, headers=hdr, timeout=8)
+            info = r.json()["result"]["info"]
+            vl = info["validated_ledger"]
+            seq = int(vl["seq"])
+            load_factor = info.get("load_factor", 256)
+            load_base = info.get("load_base", 256)
+
+            r2 = requests.post(node, json={"method": "ledger",
+                "params": [{"ledger_index": seq, "transactions": True}]}, headers=hdr, timeout=8)
+            led = r2.json()["result"]["ledger"]
+            tx_count = len(led.get("transactions", []))
+            close_time = led.get("close_time")
+
+            r3 = requests.post(node, json={"method": "ledger",
+                "params": [{"ledger_index": seq - 1, "transactions": False}]}, headers=hdr, timeout=8)
+            led_prev = r3.json()["result"]["ledger"]
+            close_prev = led_prev.get("close_time")
+
+            MARKET["xrpl_ledger_seq"] = seq
+            MARKET["xrpl_tx_count"] = tx_count
+            MARKET["xrpl_close_interval"] = (close_time - close_prev) if (close_time and close_prev) else None
+            MARKET["xrpl_base_fee"] = vl.get("base_fee_xrp")
+            MARKET["xrpl_reserve_base"] = vl.get("reserve_base_xrp")
+            MARKET["xrpl_load_pct"] = (load_factor / load_base * 100) if load_base else None
+            return  # first node that answers wins
+        except Exception:
+            continue
+
+
+# RLUSD mainnet issuer + hex currency code (Ripple / Standard Custody & Trust)
+_RLUSD_ISSUER = "rMxCKbEDwqr76QuheSUMdEGf4B9xJ8m5De"
+_RLUSD_CCY = "524C555344000000000000000000000000000000"
+
+def fetch_xrpl_dex_spread():
+    """Best bid/ask on the XRP/RLUSD pair on XRPL's native on-ledger DEX
+    (book_offers) \u2014 no exchange middleman, straight off the ledger."""
+    hdr = {"User-Agent": "XRPComplete/4", "Content-Type": "application/json"}
+    rlusd = {"currency": _RLUSD_CCY, "issuer": _RLUSD_ISSUER}
+    for node in _XRPL_NODES:
+        try:
+            # asks: offers giving XRP for RLUSD (selling XRP)
+            ra = requests.post(node, json={"method": "book_offers", "params": [
+                {"taker_gets": {"currency": "XRP"}, "taker_pays": rlusd, "limit": 5}]},
+                headers=hdr, timeout=8)
+            asks = ra.json()["result"]["offers"]
+            # bids: offers giving RLUSD for XRP (buying XRP)
+            rb = requests.post(node, json={"method": "book_offers", "params": [
+                {"taker_gets": rlusd, "taker_pays": {"currency": "XRP"}, "limit": 5}]},
+                headers=hdr, timeout=8)
+            bids = rb.json()["result"]["offers"]
+            if not asks or not bids:
+                return
+
+            def _price(offer, xrp_side):
+                # xrp_side: which field ("TakerGets"/"TakerPays") holds the plain-XRP drops string
+                xrp_drops = float(offer[xrp_side])
+                other_field = "TakerPays" if xrp_side == "TakerGets" else "TakerGets"
+                rlusd_amt = float(offer[other_field]["value"])
+                xrp_amt = xrp_drops / 1_000_000
+                return rlusd_amt / xrp_amt if xrp_amt else None
+
+            best_ask = _price(asks[0], "TakerGets")   # giving XRP, receiving RLUSD
+            best_bid = _price(bids[0], "TakerPays")   # paying XRP, receiving RLUSD
+            if best_ask and best_bid:
+                MARKET["xrpl_dex_ask"] = best_ask
+                MARKET["xrpl_dex_bid"] = best_bid
+                mid = (best_ask + best_bid) / 2
+                MARKET["xrpl_dex_spread_pct"] = (best_ask - best_bid) / mid * 100 if mid else None
+            return
+        except Exception:
+            continue
+
+
 def fetch_fx():
     hdr = {"User-Agent": "XRPComplete/4"}
     codes = ["EUR", "GBP", "JPY", "AUD", "CAD", "SGD", "INR", "BRL",
@@ -16174,6 +16301,9 @@ def _bg_refresh():
             if n % 2 == 0:
                 fetch_orderbook()
                 fetch_derivatives()
+                fetch_long_short_ratio()
+                fetch_xrpl_network()
+                fetch_xrpl_dex_spread()
             if n % 60 == 0:  # check hourly whether the 3-day static directory refresh is due
                 load_static_partner_directory()
         except Exception:
@@ -21888,8 +22018,8 @@ def render_page(page="main"):
     # V181: thin solid explainer bar, ADVANCED page only, directly under the nav bar
     _adv_bar = (
         '<div class="adv-bar">Advanced Institutional Metrics \u2014 derivatives positioning, '
-        'realized volatility, on-chain valuation, exchange supply, and tracked ETF/ETP AUM. '
-        'Not shown elsewhere on the site.</div>'
+        'realized volatility, on-chain valuation, trader positioning, and XRPL network health. '
+        'All eight cards are live. Not shown elsewhere on the site.</div>'
         if page == "advanced" else ""
     )
 
@@ -22958,7 +23088,7 @@ def render_page(page="main"):
 
 """
 
-    # ── V180 — ADVANCED PAGE prep ──────────────────────────────────────
+    # ── V185 — ADVANCED PAGE prep (all eight cards are live) ────────────
     if MARKET.get("funding") is not None:
         _fr = MARKET["funding"]
         adv_fr_str = f"{_fr:+.4f}%"
@@ -22969,7 +23099,7 @@ def render_page(page="main"):
 
     if MARKET.get("open_interest") is not None:
         adv_oi_str = f"{MARKET['open_interest']:,.0f} XRP"
-        adv_oi_usd = f"${MARKET['open_interest_usd']:,.1f}".replace(".0", "") if MARKET.get("open_interest_usd") else "\u2014"
+        adv_oi_usd = "\u2014"
         if MARKET.get("open_interest_usd"):
             _oiu = MARKET["open_interest_usd"]
             adv_oi_usd = f"${_oiu/1e6:,.1f}M" if _oiu < 1e9 else f"${_oiu/1e9:,.2f}B"
@@ -22990,26 +23120,60 @@ def render_page(page="main"):
     else:
         adv_vol_str, adv_vol_band, adv_vol_color = "\u2014", "\u2014", "var(--tx)"
 
-    _nvt = ADVANCED_MANUAL["nvt"]
-    _exr = ADVANCED_MANUAL["exchange_reserve_pct"]
-    adv_etp_rows = "".join(
-        f'<tr><td>{html.escape(row["name"])}</td>'
-        f'<td style="text-align:center">{html.escape(row["market"])}</td>'
-        f'<td style="text-align:center;color:var(--gr)">{html.escape(row["status"])}</td>'
-        f'<td style="text-align:right;font-weight:800">{html.escape(row["aum"])}</td>'
-        f'<td style="text-align:right;color:var(--tx);font-size:12px">{html.escape(row["asof"])}</td></tr>'
-        for row in ADVANCED_MANUAL["etp_aum"]
-    )
+    _nvt_val = nvt_live()
+    adv_nvt_str = f"{_nvt_val:.1f}" if _nvt_val else "\u2014"
 
-    _B['advanced'] = f"""    <!-- SECTION 47: ADVANCED (V180) -->
+    if MARKET.get("ls_ratio") is not None:
+        _ls = MARKET["ls_ratio"]
+        adv_ls_str = f"{_ls:.2f} : 1"
+        adv_ls_color = "var(--gr)" if _ls >= 1 else "var(--rd)"
+        adv_ls_note = "More accounts long than short" if _ls >= 1 else "More accounts short than long"
+    else:
+        adv_ls_str, adv_ls_color, adv_ls_note = "\u2014", "var(--tx)", "Awaiting data"
+
+    if MARKET.get("xrpl_ledger_seq") is not None:
+        adv_xrpl_seq = f"{MARKET['xrpl_ledger_seq']:,}"
+        adv_xrpl_interval = f"{MARKET['xrpl_close_interval']}s" if MARKET.get("xrpl_close_interval") else "\u2014"
+        adv_xrpl_tx = f"{MARKET['xrpl_tx_count']:,}" if MARKET.get("xrpl_tx_count") is not None else "\u2014"
+        adv_xrpl_fee = f"{MARKET['xrpl_base_fee']} XRP" if MARKET.get("xrpl_base_fee") is not None else "\u2014"
+        _lp = MARKET.get("xrpl_load_pct")
+        adv_xrpl_load = f"{_lp:.0f}%" if _lp is not None else "\u2014"
+        adv_xrpl_load_color = "var(--gr)" if (_lp is None or _lp <= 110) else "var(--or)" if _lp <= 200 else "var(--rd)"
+    else:
+        adv_xrpl_seq = adv_xrpl_interval = adv_xrpl_tx = adv_xrpl_fee = adv_xrpl_load = "\u2014"
+        adv_xrpl_load_color = "var(--tx)"
+
+    _esc_dt, _esc_days, _esc_hrs = next_escrow_release()
+    adv_esc_date = _esc_dt.strftime("%b %-d, %Y") if hasattr(_esc_dt, "strftime") else str(_esc_dt)
+    adv_esc_countdown = f"{_esc_days}d {_esc_hrs}h"
+
+    _obids = MARKET.get("ob_bids") or []
+    _oasks = MARKET.get("ob_asks") or []
+    if _obids and _oasks:
+        _bb, _ba = _obids[0][0], _oasks[0][0]
+        _mid = (_bb + _ba) / 2
+        adv_ob_bid = f"${_bb:.4f}"
+        adv_ob_ask = f"${_ba:.4f}"
+        adv_ob_spread_pct = f"{(_ba - _bb) / _mid * 100:.3f}%" if _mid else "\u2014"
+    else:
+        adv_ob_bid = adv_ob_ask = adv_ob_spread_pct = "\u2014"
+
+    if MARKET.get("xrpl_dex_bid") is not None:
+        adv_dex_bid = f"${MARKET['xrpl_dex_bid']:.4f}"
+        adv_dex_ask = f"${MARKET['xrpl_dex_ask']:.4f}"
+        adv_dex_spread = f"{MARKET['xrpl_dex_spread_pct']:.3f}%" if MARKET.get("xrpl_dex_spread_pct") is not None else "\u2014"
+    else:
+        adv_dex_bid = adv_dex_ask = adv_dex_spread = "\u2014"
+
+    _B['advanced'] = f"""    <!-- SECTION 47: ADVANCED (V185 — all-live redesign) -->
     <div class="acct" style="border-color:rgba(0,229,204,.35);margin:10px 0">
       <div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F4C8</span> Advanced Institutional Metrics</div>
-      <div class="trk-tag" style="color:var(--tx)">Five metrics not shown elsewhere on the site \u2014 derivatives positioning, realized risk, on-chain valuation, exchange supply, and tracked fund AUM.</div>
+      <div class="trk-tag" style="color:var(--tx)">Eight live metrics not shown elsewhere on the site \u2014 derivatives positioning, realized risk, on-chain valuation, trader positioning, XRPL network health, and on/off-ledger liquidity. Nothing on this page is a manual figure; every card refreshes automatically.</div>
 
       <div class="am-grid2" style="margin-bottom:10px">
         <div class="am-panel">
           <div class="am-title" style="color:var(--tq)">\u26A1 Derivatives Snapshot</div>
-          <div class="am-sub">XRPUSDT perpetual \u2014 funding rate &amp; open interest \u00B7 source: Bybit</div>
+          <div class="am-sub">XRPUSDT perpetual \u2014 funding rate &amp; open interest \u00B7 source: OKX</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="abox" style="border-left-color:{adv_fr_color}"><div class="abox-lbl">Funding Rate (8h)</div>
               <div class="abox-val" style="color:{adv_fr_color}">{adv_fr_str}</div>
@@ -23030,29 +23194,59 @@ def render_page(page="main"):
 
       <div class="am-grid2" style="margin-bottom:10px">
         <div class="am-panel">
-          <div class="am-title" style="color:var(--or)">\U0001F522 NVT Ratio <span style="font-size:11px;color:var(--tx);font-weight:600">(Est.)</span></div>
-          <div class="am-sub">Network Value to Transactions \u2014 market cap \u00F7 estimated on-chain settlement value</div>
-          <div class="abox" style="border-left-color:var(--or)"><div class="abox-lbl">NVT (as of {html.escape(_nvt["asof"])})</div>
-            <div class="abox-val">{html.escape(_nvt["value"])}</div></div>
-          <div style="font-size:11px;color:var(--tx);margin-top:8px;line-height:1.5">{html.escape(_nvt["note"])}</div>
+          <div class="am-title" style="color:var(--or)">\U0001F522 NVT Ratio <span style="font-size:11px;color:var(--tx);font-weight:600">(Live)</span></div>
+          <div class="am-sub">Market cap \u00F7 24h exchange-reported volume \u2014 a live proxy for true on-chain NVT, which no free feed publishes</div>
+          <div class="abox" style="border-left-color:var(--or)"><div class="abox-lbl">NVT (volume-proxy)</div>
+            <div class="abox-val">{adv_nvt_str}</div></div>
         </div>
         <div class="am-panel">
-          <div class="am-title" style="color:var(--or)">\U0001F4B0 Exchange Reserve <span style="font-size:11px;color:var(--tx);font-weight:600">(Est.)</span></div>
-          <div class="am-sub">Share of circulating XRP supply held on known exchange wallets</div>
-          <div class="abox" style="border-left-color:var(--or)"><div class="abox-lbl">On Exchanges (as of {html.escape(_exr["asof"])})</div>
-            <div class="abox-val">{html.escape(_exr["value"])}</div></div>
-          <div style="font-size:11px;color:var(--tx);margin-top:8px;line-height:1.5">{html.escape(_exr["note"])}</div>
+          <div class="am-title" style="color:var(--or)">\u2696\uFE0F Long/Short Ratio</div>
+          <div class="am-sub">OKX top-trader account positioning \u2014 XRP perpetuals</div>
+          <div class="abox" style="border-left-color:{adv_ls_color}"><div class="abox-lbl">Long : Short</div>
+            <div class="abox-val" style="color:{adv_ls_color}">{adv_ls_str}</div>
+            <div style="font-size:11px;color:var(--tx);margin-top:2px">{adv_ls_note}</div></div>
+        </div>
+      </div>
+
+      <div class="am-grid2" style="margin-bottom:10px">
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--tq)">\U0001F310 XRPL Network Health</div>
+          <div class="am-sub">Straight from the XRP Ledger \u2014 validated ledger, close cadence, throughput, fees</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="abox"><div class="abox-lbl">Validated Ledger</div><div class="abox-val" style="font-size:15px">{adv_xrpl_seq}</div></div>
+            <div class="abox"><div class="abox-lbl">Close Interval</div><div class="abox-val" style="font-size:15px">{adv_xrpl_interval}</div></div>
+            <div class="abox"><div class="abox-lbl">Txns in Ledger</div><div class="abox-val" style="font-size:15px">{adv_xrpl_tx}</div></div>
+            <div class="abox" style="border-left-color:{adv_xrpl_load_color}"><div class="abox-lbl">Network Load</div><div class="abox-val" style="font-size:15px;color:{adv_xrpl_load_color}">{adv_xrpl_load}</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px">Base fee: {adv_xrpl_fee} \u00B7 100% load = normal, no queuing</div>
+        </div>
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--tq)">\u23F3 Escrow Countdown</div>
+          <div class="am-sub">Ripple's monthly XRP escrow release \u2014 date math, always accurate</div>
+          <div class="abox" style="border-left-color:var(--tq)"><div class="abox-lbl">Next Release ({html.escape(adv_esc_date)})</div>
+            <div class="abox-val">{adv_esc_countdown}</div></div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px">Scheduled for the 1st of the month UTC; exact execution time within that day can vary.</div>
         </div>
       </div>
 
       <div class="am-grid2">
-        <div class="am-panel" style="grid-column:1/3">
-          <div class="am-title" style="color:var(--gr)">\U0001F3E6 ETP / ETF AUM Tracker <span style="font-size:11px;color:var(--tx);font-weight:600">(curated, updated periodically)</span></div>
-          <div class="am-sub">Assets under management for live XRP exchange-traded products \u2014 sourced from fund filings and factsheets</div>
-          <table class="pt-tbl">
-            <thead><tr><th>Product</th><th style="text-align:center">Market</th><th style="text-align:center">Status</th><th style="text-align:right">AUM</th><th style="text-align:right">As Of</th></tr></thead>
-            <tbody>{adv_etp_rows}</tbody>
-          </table>
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--gr)">\U0001F4CA Order Book Spread</div>
+          <div class="am-sub">Best bid/ask, XRP/USD \u00B7 source: Coinbase</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="abox" style="border-left-color:var(--gr)"><div class="abox-lbl">Best Bid</div><div class="abox-val" style="color:var(--gr);font-size:15px">{adv_ob_bid}</div></div>
+            <div class="abox" style="border-left-color:var(--rd)"><div class="abox-lbl">Best Ask</div><div class="abox-val" style="color:var(--rd);font-size:15px">{adv_ob_ask}</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px">Spread: {adv_ob_spread_pct}</div>
+        </div>
+        <div class="am-panel">
+          <div class="am-title" style="color:var(--gr)">\U0001F517 XRPL DEX Spread</div>
+          <div class="am-sub">Best bid/ask, XRP/RLUSD \u2014 on-ledger, no exchange middleman</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="abox" style="border-left-color:var(--gr)"><div class="abox-lbl">Best Bid</div><div class="abox-val" style="color:var(--gr);font-size:15px">{adv_dex_bid}</div></div>
+            <div class="abox" style="border-left-color:var(--rd)"><div class="abox-lbl">Best Ask</div><div class="abox-val" style="color:var(--rd);font-size:15px">{adv_dex_ask}</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--tx);margin-top:8px">Spread: {adv_dex_spread}</div>
         </div>
       </div>
     </div>
