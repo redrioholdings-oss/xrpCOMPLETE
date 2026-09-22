@@ -259,7 +259,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "195"
+APP_VERSION = "196"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -20887,6 +20887,7 @@ def fetch_market():
             MARKET["mcap"]      = float(q.get("market_cap", 0) or 0)
             MARKET["vol24"]     = float(q.get("volume_24h", 0) or 0)
             MARKET["rank"]      = d.get("rank")
+            MARKET["price_ok_ts"] = time.time()
             active += 1
     except Exception:
         pass
@@ -21794,6 +21795,20 @@ def _hc3_chg(v, dec=2, suffix=""):
     return f'<span style="color:{col}">{arrow}{sign}{abs(v):.{dec}f}%</span>{suffix}'
 
 
+def header_live_html():
+    """Header LIVE badge: green + pulsing while the market feed is updating,
+    amber DELAYED if the last good update is 3-15 min old, red OFFLINE beyond."""
+    ts = MARKET.get("price_ok_ts")
+    age = (time.time() - ts) if ts else None
+    if age is not None and age < 180:
+        st, txt = "ok", "LIVE"
+    elif age is not None and age < 900:
+        st, txt = "warn", "DELAYED"
+    else:
+        st, txt = "down", "OFFLINE"
+    return f'<span class="lv3 lv3-{st}"><span class="lv3-dot"></span>{txt}</span>'
+
+
 def header_cards_values():
     """Formatted HTML for each overlay slot, keyed by slot name."""
     p, c = MARKET.get("xrp_price"), MARKET.get("xrp_chg")
@@ -21822,6 +21837,7 @@ def header_cards_values():
         "btc":    (f'${HDR["btc_price"]:,.0f} <span class="hc3-sm">{_hc3_chg(HDR.get("btc_chg"), 1)}</span>' if HDR.get("btc_price") else dash),
         "eth":    (f'${HDR["eth_price"]:,.0f} <span class="hc3-sm">{_hc3_chg(HDR.get("eth_chg"), 1)}</span>' if HDR.get("eth_price") else dash),
         "xrpm":   (f'{xp} <span class="hc3-sm">{_hc3_chg(c, 1)}</span>' if p else dash),
+        "live":   header_live_html(),
     }
 
 
@@ -21831,7 +21847,7 @@ _HC3_SIZE = {"price": 2.9, "chg": 1.35, "mcap": 1.15, "vol": 1.15, "sup": 1.15, 
 
 def header_cards_html():
     vals = header_cards_values()
-    out = []
+    out = [f'<span class="hc3-live" id="hc3-live">{vals["live"]}</span>']
     for k, (l, t, h) in _HC3_POS.items():
         out.append(f'<span class="hc3" id="hc3-{k}" style="left:{l}%;top:{t}%;height:{h}%;'
                    f'font-size:{_HC3_SIZE[k]}cqw">{vals[k]}</span>')
@@ -48853,6 +48869,15 @@ def render_page(page="main"):
          color:#fff; font-weight:700; font-family:'Inter','Poppins',-apple-system,system-ui,'Segoe UI',Roboto,Arial,sans-serif;
          letter-spacing:-.01em; pointer-events:none; }}
   .hc3-sm{{ font-size:.55em; font-weight:700; }}
+  .hc3-live{{ position:absolute; left:88.475%; top:3.785%; width:8.729%; height:6.132%; background:#03030a;
+              display:flex; align-items:center; justify-content:center; line-height:1; pointer-events:none; }}
+  .lv3{{ display:flex; align-items:center; justify-content:center; gap:.7em; box-sizing:border-box; width:94%; height:86%;
+         border:max(1.5px,.11cqw) solid currentColor; border-radius:.55cqw; font-size:1.45cqw; font-weight:800;
+         letter-spacing:.18em; font-family:'Inter','Poppins',-apple-system,system-ui,'Segoe UI',Roboto,Arial,sans-serif; }}
+  .lv3-dot{{ width:.65em; height:.65em; border-radius:50%; background:currentColor; flex-shrink:0; }}
+  .lv3-ok{{ color:#5ee29a; }}  .lv3-ok .lv3-dot{{ animation:lv3pulse 1.6s ease-in-out infinite; }}
+  .lv3-warn{{ color:#f5b642; }}  .lv3-down{{ color:#f0596b; }}
+  @keyframes lv3pulse{{ 0%,100%{{ opacity:1; box-shadow:0 0 0 0 rgba(94,226,154,.7); }} 50%{{ opacity:.45; box-shadow:0 0 0 .45em rgba(94,226,154,0); }} }}
   #hc3-btc .hc3-sm, #hc3-eth .hc3-sm, #hc3-xrpm .hc3-sm{{ font-size:.75em; }}
   #hc3-chg .hc3-dim, .hc3 .hc3-dim{{ color:#aab4c8; font-weight:500; }}
   .hdr3-img{{ display:block; width:100%; height:auto; }}
