@@ -259,7 +259,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "193"
+APP_VERSION = "194"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -48856,13 +48856,13 @@ def render_page(page="main"):
   #hc3-btc .hc3-sm, #hc3-eth .hc3-sm, #hc3-xrpm .hc3-sm{{ font-size:.75em; }}
   #hc3-chg .hc3-dim, .hc3 .hc3-dim{{ color:#aab4c8; font-weight:500; }}
   .hdr3-img{{ display:block; width:100%; height:auto; }}
-  .hdr3 #breaking{{ position:absolute; left:19.5%; top:3.4%; width:62%; height:7%; background:transparent; padding:0; display:flex; align-items:center; line-height:normal; }}
+  .hdr3 #breaking{{ position:absolute; left:19.5%; top:6.8%; width:62%; height:auto; transform:translateY(-50%); background:transparent; padding:0; display:flex; align-items:center; line-height:normal; }}
   .hdr3 .bkinner{{ max-width:none; padding:0; width:100%; }}
   .hdr3 .bkrow{{ border-bottom:none; padding-bottom:0; }}
-  .hdr3 .bklbl{{ font-size:clamp(8px,1.1vw,17px); padding-right:clamp(5px,.9vw,14px); margin-right:clamp(5px,.9vw,14px); gap:clamp(3px,.6vw,9px); }}
-  .hdr3 .bk-bolt{{ font-size:clamp(10px,1.4vw,22px); }}
-  .hdr3 .bkscroll{{ height:clamp(14px,1.7vw,26px); }}
-  .hdr3 .bktext{{ font-size:clamp(8px,1vw,15px); line-height:clamp(14px,1.7vw,26px); }}
+  .hdr3 .bklbl{{ font-size:clamp(16px,2.2vw,34px); padding-right:clamp(5px,.9vw,14px); margin-right:clamp(5px,.9vw,14px); gap:clamp(3px,.6vw,9px); }}
+  .hdr3 .bk-bolt{{ font-size:clamp(20px,2.8vw,44px); }}
+  .hdr3 .bkscroll{{ height:clamp(28px,3.4vw,52px); }}
+  .hdr3 .bktext{{ font-size:clamp(16px,2vw,30px); line-height:clamp(28px,3.4vw,52px); }}
   .hdr3-tap{{ position:absolute; display:block; left:3%; width:18.7%; height:5.9%; }}
   .hdr3-blog{{ top:71.8%; }}
   .hdr3-adv{{ top:79.2%; }}
