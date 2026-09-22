@@ -259,7 +259,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "194"
+APP_VERSION = "195"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -48859,10 +48859,10 @@ def render_page(page="main"):
   .hdr3 #breaking{{ position:absolute; left:19.5%; top:6.8%; width:62%; height:auto; transform:translateY(-50%); background:transparent; padding:0; display:flex; align-items:center; line-height:normal; }}
   .hdr3 .bkinner{{ max-width:none; padding:0; width:100%; }}
   .hdr3 .bkrow{{ border-bottom:none; padding-bottom:0; }}
-  .hdr3 .bklbl{{ font-size:clamp(16px,2.2vw,34px); padding-right:clamp(5px,.9vw,14px); margin-right:clamp(5px,.9vw,14px); gap:clamp(3px,.6vw,9px); }}
-  .hdr3 .bk-bolt{{ font-size:clamp(20px,2.8vw,44px); }}
-  .hdr3 .bkscroll{{ height:clamp(28px,3.4vw,52px); }}
-  .hdr3 .bktext{{ font-size:clamp(16px,2vw,30px); line-height:clamp(28px,3.4vw,52px); }}
+  .hdr3 .bklbl{{ font-size:clamp(12px,1.65vw,25.5px); padding-right:clamp(5px,.9vw,14px); margin-right:clamp(5px,.9vw,14px); gap:clamp(3px,.6vw,9px); }}
+  .hdr3 .bk-bolt{{ font-size:clamp(15px,2.1vw,33px); }}
+  .hdr3 .bkscroll{{ height:clamp(21px,2.55vw,39px); }}
+  .hdr3 .bktext{{ font-size:clamp(12px,1.5vw,22.5px); line-height:clamp(21px,2.55vw,39px); }}
   .hdr3-tap{{ position:absolute; display:block; left:3%; width:18.7%; height:5.9%; }}
   .hdr3-blog{{ top:71.8%; }}
   .hdr3-adv{{ top:79.2%; }}
