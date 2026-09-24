@@ -5,6 +5,22 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V198 changes:
+  1. Fix: .xnav (the nav bar with the blue top/bottom border lines) had no
+     max-width, so those border lines ran edge-to-edge on wide monitors
+     instead of stopping at the site's normal 1400px boxed width. Added
+     max-width:1400px; margin:0 auto to match every other contained
+     element (.w, .bkinner, etc).
+  2. Fix: main{{}} was capped at max-width:1180px while the header/hero
+     area (.w) is capped at 1400px, so body content on every page sat
+     narrower than the header above it. Raised main{{}} to max-width:1400px
+     to match.
+  Note: the new hero image (hero4.jpg, 2360x1321) still loses sharpness
+  on monitors wider than ~2360px in-browser width, since it's a flat
+  raster image being upscaled past its native resolution. That's a
+  source-asset resolution limit, not a CSS bug -- fixing it requires a
+  higher-resolution header image, not a code change.
+
 V185 changes:
   1. ADVANCED page redesign — retired the three manually-curated cards
      (NVT estimate, Exchange Reserve estimate, ETP/ETF AUM table) and
@@ -259,7 +275,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "197"
+APP_VERSION = "198"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -48527,7 +48543,7 @@ def render_page(page="main"):
   @media(max-width:1080px){{ .pt-cols{{ grid-template-columns:1fr; }} .fx-grid{{ grid-template-columns:repeat(3,1fr); }} }}
 
   /* MAIN */
-  main{{ max-width:1180px; margin:0 auto; padding:14px 28px 90px; min-height:46vh; }}
+  main{{ max-width:1400px; margin:0 auto; padding:14px 28px 90px; min-height:46vh; }}
  
   .subtitle{{ color:var(--tx); font-size:15px; font-family:var(--mn); letter-spacing:1px; margin-bottom:22px; }}
   .note{{ border:1px solid var(--b); border-radius:8px; background:var(--s1); padding:16px 20px; color:var(--tx); font-size:15px; }}
@@ -48993,7 +49009,7 @@ def render_page(page="main"):
     .hdr2-toprow #breaking{{ flex:1 1 100%; }} }}
   .xnav{{ position:sticky; top:0; z-index:60; background:var(--bg);
          border-top:2px solid var(--hdr); border-bottom:2px solid var(--hdr);
-         padding:13px 0; }}
+         padding:13px 0; max-width:1400px; margin:0 auto; }}
   /* V173: duplicate nav above footer — identical bar, but never sticky */
   .xnav.xnav-bottom{{ position:static; z-index:1; }}
   .xnav-in{{ max-width:1280px; margin:0 auto; padding:0 10px;
