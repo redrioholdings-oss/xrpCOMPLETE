@@ -5,6 +5,19 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V209 changes:
+  1. Fix: every page load 500'd. render_page() referenced a bare name _pool
+     (in the new Whale Alert Feed block) that was never assigned in that
+     function's scope -- it only ever existed as a local inside the separate
+     compute_breaking_text() function. Confirmed this NameError was already
+     present, unmodified, in the v207 zip Rich supplied (not introduced by
+     the V208 hero edits below) -- it just hadn't been caught yet since
+     nothing had exercised that code path end-to-end. Added the missing
+     _pool = NEWS.get("pool", []) assignment at the top of the Whale Alert
+     Feed block in render_page(), mirroring the same line in
+     compute_breaking_text(). Verified locally: site now returns 200 on /,
+     with the V208 hero changes (new background, coin-row removed) intact.
+
 V208 changes:
   1. Hero background photo replaced (new text-free globe/network image supplied
      by Rich, upscaled to 2360x1321 to match the previous hero-bg.jpg's native
@@ -368,7 +381,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "208"
+APP_VERSION = "209"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -56562,6 +56575,7 @@ def render_page(page="main"):
     bktext = compute_breaking_text()
 
     # Whale Alert Feed — real whale-tagged stories when present, home-base placeholder otherwise
+    _pool = NEWS.get("pool", [])
     _whale_stories = sorted((s for s in _pool if s.get("category") == "Whale"), key=lambda s: s["dt"], reverse=True)[:8]
     if _whale_stories:
         whale_feed_html = "".join(
