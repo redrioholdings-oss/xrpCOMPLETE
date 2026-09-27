@@ -258,7 +258,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "212"
+APP_VERSION = "213"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -49493,6 +49493,9 @@ def render_page(page="main"):
                          '<path d="M3 11v6M5 5.5v11.5M9.5 8v9M11.5 12v5M12.5 12v5M14.5 8v9M19 5.5v11.5M21 11v6"/>'
                          '<path d="M1 17h22"/><path d="M7.5 17v3M16.5 17v3"/>'
                          '<path d="M5.5 20h4M14.5 20h4"/></svg>',
+        "wire":          '<svg viewBox="0 0 24 24"><circle cx="4" cy="12" r="2"/>'
+                         '<circle cx="20" cy="12" r="2"/>'
+                         '<path d="M6 12h4l1.5-5 3 10 1.5-5h4"/></svg>',
         "regulatory":    '<svg viewBox="0 0 24 24"><path d="M12 2v2"/>'
                          '<path d="M8.5 8.5a3.5 3.5 0 0 1 7 0"/><path d="M7.5 8.5h9"/>'
                          '<path d="M5.5 11.5h13"/><path d="M7 11.5v6.5M10.3 11.5v6.5M13.7 11.5v6.5M17 11.5v6.5"/>'
@@ -49521,6 +49524,7 @@ def render_page(page="main"):
     _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
               ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
               ("partnerships","/partnerships","BRIDGE"),
+              ("wire","/wire","WIRE"),
               ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"),
               ("competition","/competition","COMPETITION"), ("ecosystem","/ecosystem","ECOSYSTEM"),
               ("about","/about","ABOUT"),
@@ -51090,6 +51094,29 @@ def render_page(page="main"):
 
 """
 
+    # Same ecosystem chart, without the redundant logo/heading, for reuse
+    # on other pages (added to the BRIDGE/partnerships page at Rich's request)
+    _B['ecosystemchart'] = f"""    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
+      <div class="about-body" style="text-align:center">
+        <img src="/ecosystem.jpg?v={APP_VERSION}" alt="The XRP Ecosystem — Payments, Liquidity, Tokenization, DeFi, Real World Utility"
+             style="max-width:100%;height:auto;border-radius:10px;border:1px solid rgba(130,160,200,.3)">
+      </div>
+    </div>
+
+"""
+
+    # New WIRE page shell — nav entry, icon, and route are wired up; actual
+    # content still needed from Rich (see reply). Placeholder only.
+    _B['wire'] = f"""    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
+      <div class="about-body" style="text-align:center">
+        <img src="/logo.jpg?v={APP_VERSION}" alt="XRP Complete" style="height:56px;width:auto;margin:6px auto 18px;display:block">
+        <h1 style="margin-bottom:10px">Wire</h1>
+        <p style="color:var(--tx);font-size:15px">Page content coming soon.</p>
+      </div>
+    </div>
+
+"""
+
     _B['about'] = f"""    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
       <div class="about-body">
 
@@ -51400,7 +51427,7 @@ def render_page(page="main"):
 
 """
 
-    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystemgrid', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['bridgearchive'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'ecosystem': ['ecosystem'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore'], 'advanced': ['advanced']}
+    _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystemgrid', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['ecosystemchart', 'bridgearchive'], 'wire': ['wire'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'ecosystem': ['ecosystem'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore'], 'advanced': ['advanced']}
 
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
 
@@ -51937,6 +51964,11 @@ def page_institutional():
 @app.route("/partnerships")
 def page_partnerships():
     return Response(replace_flags_with_svg(render_page("partnerships")), mimetype="text/html")
+
+
+@app.route("/wire")
+def page_wire():
+    return Response(replace_flags_with_svg(render_page("wire")), mimetype="text/html")
 
 
 @app.route("/partnerships/export.json")
