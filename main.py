@@ -258,7 +258,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "213"
+APP_VERSION = "214"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -49524,9 +49524,8 @@ def render_page(page="main"):
     _pages = (("main","/","MAIN"), ("markets","/markets","MARKETS"),
               ("news","/news","NEWS"), ("institutional","/institutional","INSTITUTIONAL"),
               ("partnerships","/partnerships","BRIDGE"),
-              ("wire","/wire","WIRE"),
               ("regulatory","/regulatory","REGULATORY"), ("community","/community","COMMUNITY"),
-              ("competition","/competition","COMPETITION"), ("ecosystem","/ecosystem","ECOSYSTEM"),
+              ("competition","/competition","COMPETITION"), ("wire","/wire","WIRE"),
               ("about","/about","ABOUT"),
               ("blog","https://xrpcompleteblog.com","BLOG"))
     _nav = ('<nav class="xnav"><div class="xnav-in">' + ''.join(
@@ -52049,11 +52048,6 @@ def ecosystem_jpg():
     """XRP Ecosystem infographic (V178), served as embedded."""
     return Response(ECOSYSTEM_BYTES, mimetype="image/jpeg",
                     headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.route("/ecosystem")
-def page_ecosystem():
-    return Response(replace_flags_with_svg(render_page("ecosystem")), mimetype="text/html")
 
 
 @app.route("/about")
