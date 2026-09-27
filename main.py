@@ -5,6 +5,26 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V210 changes:
+  1. Fix: the hero's live price chart was rendering gigantic, stretched across
+     the entire header and overlapping the headline, stat cards, capability
+     row, and logo row. Cause: xrp_chart_svg() set the SVG's own inline style
+     to position:absolute;inset:0;width:100%;height:100% -- taking it out of
+     normal flow entirely and sizing it against the nearest POSITIONED
+     ancestor. Its wrapper div (.panel-chart) is not position:relative, so
+     the SVG skipped past it and sized itself to .hero-inner instead (the
+     whole hero content box), which is exactly what showed in Rich's
+     screenshot. The page's own stylesheet already had the correct rule
+     sitting right next to it (.panel-chart svg{width:100%;height:auto;
+     display:block}) -- the inline style was silently overriding it. Removed
+     the inline position:absolute/inset:0 block so the SVG follows that
+     existing CSS rule and stays boxed inside its own chart panel, sized by
+     its viewBox aspect ratio like it was always meant to. Verified locally:
+     page renders 200 OK with no position:absolute;inset:0 left in the
+     output (couldn't visually confirm the line itself in this sandbox --
+     no live market data here to plot -- but the override that was blowing
+     out the layout is confirmed gone).
+
 V209 changes:
   1. Fix: every page load 500'd. render_page() referenced a bare name _pool
      (in the new Whale Alert Feed block) that was never assigned in that
@@ -381,7 +401,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "209"
+APP_VERSION = "210"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -30994,8 +31014,7 @@ def xrp_chart_svg(closes, width=594, height=230):
     up = closes[-1] >= closes[0]
     color = "#4ade80" if up else "#f0596b"
     return (
-        f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
-        f'style="position:absolute;inset:0;width:100%;height:100%">'
+        f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="none">'
         f'<defs><linearGradient id="cf" x1="0" y1="0" x2="0" y2="1">'
         f'<stop offset="0%" stop-color="{color}" stop-opacity="0.32"/>'
         f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/>'
