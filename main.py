@@ -29,6 +29,10 @@ V212-V215 changes (on the v188 base):
                  pulled through Google News site: queries (direct wire feed URLs could not be verified).
      WIRE also shows a live source-health line (feeds ok, last XRPL ledger, SEC status). WIRE store is
      now lock-protected (three background threads write to it). No new pip dependencies.
+  V217: header ad button "UP TO THE MINUTE NEWSWIRE" added beside the BLOG / ADVANCED buttons in the
+     hero (as sketched by Rich), linking to /wire. Amber outline, soft pulsing glow (off for visitors
+     who prefer reduced motion), same height as the two stacked buttons; wraps under them on narrow
+     screens. The header is shared, so it shows on every page. Blog site header not touched.
 
 
 V185 changes:
@@ -284,7 +288,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "216"
+APP_VERSION = "217"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -49836,6 +49840,18 @@ def render_page(page="main"):
   .hero-btnstack{{ display:flex; flex-direction:column; gap:10px; align-items:flex-start; }}
   .hero-advbtn{{ color:#E0447C; border-color:#E0447C; }}
   .hero-advbtn:hover{{ background:rgba(224,68,124,.12); }}
+  /* V217: "UP TO THE MINUTE NEWSWIRE" ad button, beside the BLOG/ADVANCED stack, links to /wire */
+  .hero-ctarow{{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }}
+  .hero-wirebtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+                 width:170px; padding:8px 6px; box-sizing:border-box; text-align:center; text-decoration:none;
+                 color:var(--or); border:1px solid var(--or); border-radius:7px; font-weight:800;
+                 letter-spacing:1.6px; line-height:1.25; animation:wbglow 2.6s ease-in-out infinite; }}
+  .hero-wirebtn span{{ font-size:11px; }}
+  .hero-wirebtn .wb-big{{ font-size:16px; letter-spacing:1.4px; margin-top:2px; }}
+  .hero-wirebtn:hover{{ background:rgba(255,153,0,.12); }}
+  @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,153,0,0); }} 50%{{ box-shadow:0 0 14px rgba(255,153,0,.45); }} }}
+  @media(prefers-reduced-motion:reduce){{ .hero-wirebtn{{ animation:none; }} }}
+  @media(max-width:480px){{ .hero-wirebtn{{ width:216px; padding:12px 6px; }} }}
   /* V181: thin solid explainer bar under the nav, ADVANCED page only */
   .adv-bar{{ background:#E0447C; color:#1a0410; font-weight:800; font-size:13px;
             letter-spacing:.3px; text-align:center; padding:9px 16px; }}
@@ -50000,9 +50016,12 @@ def render_page(page="main"):
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.3 2.6 14.7 0 17-2.6-2.3-2.6-14.7 0-17z"/></svg><span>INSTITUTIONAL<br>ADOPTION</span></div>
             <div class="feat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8"/><circle cx="5" cy="5" r="1.8"/><circle cx="19" cy="5" r="1.8"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="19" r="1.8"/><path d="M6.3 6.3 10.7 10.7M17.7 6.3 13.3 10.7M6.3 17.7 10.7 13.3M17.7 17.7 13.3 13.3"/></svg><span>XRPL<br>ECOSYSTEM</span></div>
           </div>
-          <div class="hero-btnstack">
-            <a class="hc-blog hero-blogbtn" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
-            <a class="hc-blog hero-blogbtn hero-advbtn" href="/advanced">ADVANCED <span class="cta-ar">&#8594;</span></a>
+          <div class="hero-ctarow">
+            <div class="hero-btnstack">
+              <a class="hc-blog hero-blogbtn" href="https://xrpcompleteblog.com" target="_blank" rel="noopener">BLOG <span class="cta-ar">&#8594;</span></a>
+              <a class="hc-blog hero-blogbtn hero-advbtn" href="/advanced">ADVANCED <span class="cta-ar">&#8594;</span></a>
+            </div>
+            <a class="hero-wirebtn" href="/wire" aria-label="Up to the minute newswire"><span>UP TO THE</span><span>MINUTE</span><span class="wb-big">NEWSWIRE</span></a>
           </div>
         </div>
         <div class="hero-card">
