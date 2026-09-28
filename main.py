@@ -30,9 +30,10 @@ V212-V215 changes (on the v188 base):
      WIRE also shows a live source-health line (feeds ok, last XRPL ledger, SEC status). WIRE store is
      now lock-protected (three background threads write to it). No new pip dependencies.
   V217: header ad button "UP TO THE MINUTE NEWSWIRE" added beside the BLOG / ADVANCED buttons in the
-     hero (as sketched by Rich), linking to /wire. Amber outline, soft pulsing glow (off for visitors
+     hero (as sketched by Rich), linking to /wire. White outline and text (per Rich), soft pulsing glow (off for visitors
      who prefer reduced motion), same height as the two stacked buttons; wraps under them on narrow
      screens. The header is shared, so it shows on every page. Blog site header not touched.
+  V218: NEWSWIRE header button recolored to white lines (border + text) instead of amber.
 
 
 V185 changes:
@@ -288,7 +289,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "217"
+APP_VERSION = "218"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -49844,12 +49845,12 @@ def render_page(page="main"):
   .hero-ctarow{{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }}
   .hero-wirebtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
                  width:170px; padding:8px 6px; box-sizing:border-box; text-align:center; text-decoration:none;
-                 color:var(--or); border:1px solid var(--or); border-radius:7px; font-weight:800;
+                 color:#fff; border:1px solid #fff; border-radius:7px; font-weight:800;
                  letter-spacing:1.6px; line-height:1.25; animation:wbglow 2.6s ease-in-out infinite; }}
   .hero-wirebtn span{{ font-size:11px; }}
   .hero-wirebtn .wb-big{{ font-size:16px; letter-spacing:1.4px; margin-top:2px; }}
-  .hero-wirebtn:hover{{ background:rgba(255,153,0,.12); }}
-  @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,153,0,0); }} 50%{{ box-shadow:0 0 14px rgba(255,153,0,.45); }} }}
+  .hero-wirebtn:hover{{ background:rgba(255,255,255,.12); }}
+  @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,255,255,0); }} 50%{{ box-shadow:0 0 14px rgba(255,255,255,.4); }} }}
   @media(prefers-reduced-motion:reduce){{ .hero-wirebtn{{ animation:none; }} }}
   @media(max-width:480px){{ .hero-wirebtn{{ width:216px; padding:12px 6px; }} }}
   /* V181: thin solid explainer bar under the nav, ADVANCED page only */
