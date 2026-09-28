@@ -5,6 +5,19 @@ Version 102 — Full rebrand: XRP Complete → XRP Complete (xrpcomplete.com)
 Red Rio Ventures, LLC
 ═══════════════════════════════════════════════════════════════════════
 
+V212-V215 changes (on the v188 base):
+  V212: hero background photo swapped for the new bridge/globe image (upscaled to 2360x1321).
+  V213/V214: WIRE page added, replacing ECOSYSTEM in its nav slot (icon = two nodes with a
+     signal pulse); /ecosystem page + route retired (its image route /ecosystem.jpg kept);
+     the ecosystem chart now sits at the top of the BRIDGE page.
+  V215: WIRE is now a live news page. New "fast lane": every direct outlet feed plus six
+     "last hour" Google News queries (83 feeds) polled every 30s with conditional GET
+     (ETag / If-Modified-Since), kept in a rolling 48h store. The main 5-minute engine is
+     untouched; WIRE shows fast-lane items UNIONED with the slow pool, newest first,
+     de-duplicated. New /api/wire JSON endpoint; the page polls it every 15s, flashes new
+     items, ticks ages every second, and has ALL / BREAKING tabs. Verified with fake feeds
+     (incl. 304 path) -- real-feed latency can only be measured once deployed.
+
 V185 changes:
   1. ADVANCED page redesign — retired the three manually-curated cards
      (NVT estimate, Exchange Reserve estimate, ETP/ETF AUM table) and
@@ -258,7 +271,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "214"
+APP_VERSION = "215"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -22957,6 +22970,203 @@ def fetch_news():
     _detect_partnership_deals(pool)
     _track_catalyst_clock(pool)
     _track_narrative_diffusion(pool)
+
+
+# ── V215: WIRE fast lane ─────────────────────────────────────────────────
+# The main news loop polls all feeds every 5 min. WIRE polls a fast subset (every
+# direct outlet feed + a few "last hour" Google News queries) every 30 s, using
+# conditional GET (ETag / Last-Modified) so quiet feeds cost almost nothing, and
+# keeps its own rolling 48h store. The WIRE page shows this store UNIONED with the
+# slow pool, so nothing the main engine finds is ever missing from WIRE.
+_GN = "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+WIRE_FAST_FEEDS = [(n, u) for n, u in NEWS_FEEDS if "news.google.com" not in u] + [
+    ("GN Live: XRP 1h",       _GN.format(q="XRP+when:1h")),
+    ("GN Live: Ripple 1h",    _GN.format(q="Ripple+XRP+when:1h")),
+    ("GN Live: XRP ETF 1h",   _GN.format(q="XRP+ETF+when:1h")),
+    ("GN Live: XRP SEC 1h",   _GN.format(q="XRP+SEC+when:1h")),
+    ("GN Live: XRPL 1h",      _GN.format(q="XRPL+OR+%22XRP+Ledger%22+when:1h")),
+    ("GN Live: XRP 6h",       _GN.format(q="XRP+when:6h")),
+]
+WIRE_POLL_SECONDS = 30
+WIRE_KEEP_HOURS = 48
+WIRE_MAX_ITEMS = 400
+WIRE_ITEMS = {}          # key -> item dict (rolling store)
+WIRE_HTTP_CACHE = {}     # url -> {"etag":..., "lm":..., "entries": [...]}
+WIRE = {"updated": None, "feeds_ok": 0, "feeds_total": len(WIRE_FAST_FEEDS), "cycle_ms": None}
+
+def _fetch_one_feed_cond(name, url):
+    """Conditional GET. Returns (name, entries). 304 -> cached entries."""
+    c = WIRE_HTTP_CACHE.get(url, {})
+    hdr = {"User-Agent": "Mozilla/5.0 XRPComplete/26"}
+    if c.get("etag"):
+        hdr["If-None-Match"] = c["etag"]
+    if c.get("lm"):
+        hdr["If-Modified-Since"] = c["lm"]
+    try:
+        r = requests.get(url, headers=hdr, timeout=6)
+        if r.status_code == 304:
+            return name, c.get("entries", [])
+        if r.status_code != 200:
+            return name, c.get("entries", [])
+        entries = _parse_feed(r.content)
+        WIRE_HTTP_CACHE[url] = {"etag": r.headers.get("ETag"), "lm": r.headers.get("Last-Modified"),
+                                "entries": entries}
+        return name, entries
+    except Exception:
+        return name, c.get("entries", [])
+
+def fetch_wire():
+    t0 = time.time()
+    now = datetime.now(timezone.utc)
+    results = {}
+    with ThreadPoolExecutor(max_workers=24) as ex:
+        futs = [ex.submit(_fetch_one_feed_cond, n, u) for n, u in WIRE_FAST_FEEDS]
+        for f in as_completed(futs):
+            n, entries = f.result()
+            results[n] = entries
+    ok = 0
+    for name, url in WIRE_FAST_FEEDS:
+        entries = results.get(name) or []
+        if entries:
+            ok += 1
+        for e in entries:
+            title = e.get("title")
+            if not title:
+                continue
+            text = title + " " + e.get("summary", "")
+            low = text.lower()
+            if "xrp" not in low and "ripple" not in low:
+                continue
+            key = title.lower()[:80]
+            if key in WIRE_ITEMS:
+                continue
+            if _is_foreign(title):
+                continue
+            dt = _parse_date(e.get("date_str")) or now
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if dt > now + timedelta(minutes=5):
+                dt = now                      # bad publisher clock
+            if (now - dt).total_seconds() > WIRE_KEEP_HOURS * 3600:
+                continue
+            infl = _influence(text, name)
+            WIRE_ITEMS[key] = {
+                "key": key, "title": title, "link": e.get("link") or "#", "source": name,
+                "dt": dt, "seen_at": now, "sentiment": _sentiment(text), "influence": infl,
+                "breaking": _is_breaking(text, infl),
+                "category": _category(title + " " + _clean_summary(e.get("summary", ""))),
+            }
+    cutoff = now.timestamp() - WIRE_KEEP_HOURS * 3600
+    for k in [k for k, v in WIRE_ITEMS.items() if v["dt"].timestamp() < cutoff]:
+        del WIRE_ITEMS[k]
+    if len(WIRE_ITEMS) > WIRE_MAX_ITEMS:
+        keep = sorted(WIRE_ITEMS.values(), key=lambda s: s["dt"], reverse=True)[:WIRE_MAX_ITEMS]
+        WIRE_ITEMS.clear()
+        WIRE_ITEMS.update({s["key"]: s for s in keep})
+    WIRE["updated"] = now
+    WIRE["feeds_ok"] = ok
+    WIRE["cycle_ms"] = int((time.time() - t0) * 1000)
+
+def wire_snapshot(limit=120, max_age_hours=36):
+    """Fast-lane store UNION the slow pool, newest first, de-duplicated."""
+    now = datetime.now(timezone.utc)
+    cutoff = now.timestamp() - max_age_hours * 3600
+    merged = dict(WIRE_ITEMS)
+    for s in list(NEWS.get("pool", [])):
+        if s.get("foreign") or s["key"] in merged:
+            continue
+        merged[s["key"]] = s
+    items = [s for s in merged.values() if s["dt"].timestamp() >= cutoff]
+    items.sort(key=lambda s: s["dt"], reverse=True)
+    return items[:limit]
+
+def wire_item_json(s):
+    return {"id": s["key"], "title": s["title"], "link": s["link"], "source": s["source"],
+            "ts": int(s["dt"].timestamp()), "sentiment": s.get("sentiment", "neutral"),
+            "breaking": bool(s.get("breaking")), "category": s.get("category") or ""}
+
+def _bg_wire():
+    while True:
+        try:
+            fetch_wire()
+        except Exception:
+            pass
+        time.sleep(WIRE_POLL_SECONDS)
+
+
+_WIRE_CSS = """<style>
+.wr-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:8px}
+.wr-title{font-size:22px;font-weight:800;color:#fff;letter-spacing:.06em;font-family:var(--mn)}
+.wr-live{display:inline-flex;align-items:center;gap:7px;font-family:var(--mn);font-size:12px;font-weight:800;letter-spacing:1.2px;color:var(--gr)}
+.wr-dot{width:8px;height:8px;border-radius:50%;background:var(--gr);box-shadow:0 0 6px var(--gr);animation:wrblink 1.4s ease-in-out infinite}
+@keyframes wrblink{0%,100%{opacity:1}50%{opacity:.2}}
+.wr-stat{font-family:var(--mn);font-size:12px;color:var(--tx);margin-bottom:10px}
+.wr-tabs{display:flex;gap:8px;margin-bottom:10px}
+.wr-tab{font-family:var(--mn);font-size:12px;font-weight:800;letter-spacing:1px;padding:6px 14px;border:1px solid rgba(255,255,255,.2);background:transparent;color:var(--tx);border-radius:3px;cursor:pointer}
+.wr-tab.on{color:#000;background:var(--or);border-color:var(--or)}
+.wr-row{display:grid;grid-template-columns:78px 1fr;gap:4px 12px;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);font-family:var(--mn);align-items:baseline}
+.wr-age{color:var(--or);font-size:12px;font-weight:800;white-space:nowrap}
+.wr-hl{color:var(--br);text-decoration:none;font-size:15px;line-height:1.35;font-weight:600}
+.wr-hl:hover{text-decoration:underline}
+.wr-meta{grid-column:2;font-size:11px;color:var(--tx);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wr-brk{border-left:3px solid var(--rd);background:rgba(255,64,96,.06)}
+.wr-badge{font-size:10px;font-weight:800;letter-spacing:1px;padding:1px 6px;border-radius:2px;border:1px solid currentColor}
+.wr-new{animation:wrflash 6s ease-out}
+@keyframes wrflash{0%{background:rgba(255,153,0,.35)}100%{background:transparent}}
+.wr-empty{padding:24px;color:var(--tx);font-family:var(--mn)}
+</style>"""
+
+_WIRE_JS = """<script>
+(function(){
+  var list=document.getElementById('wr-list'), stat=document.getElementById('wr-stat');
+  if(!list) return;
+  var onlyBrk=false, items=[], known={}, firstLoad=true, newAt={}, lastOk=0, serverUpd=0;
+  function ago(ts){var s=Math.max(0,Math.floor(Date.now()/1000-ts));
+    if(s<60)return s+'s ago'; if(s<3600)return Math.floor(s/60)+'m ago';
+    if(s<86400)return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago';}
+  function safeHref(u){return /^https?:\\/\\//i.test(u)?u:'#';}
+  function el(t,c,x){var e=document.createElement(t); if(c)e.className=c; if(x!==undefined)e.textContent=x; return e;}
+  function render(){
+    list.textContent='';
+    var shown=items.filter(function(i){return !onlyBrk||i.breaking;});
+    if(!shown.length){list.appendChild(el('div','wr-empty','No stories yet. New XRP headlines appear here the moment they are found.'));return;}
+    shown.forEach(function(i){
+      var fresh=newAt[i.id]&&(Date.now()-newAt[i.id]<30000);
+      var row=el('div','wr-row'+(i.breaking?' wr-brk':'')+(fresh?' wr-new':''));
+      var a=el('span','wr-age',ago(i.ts)); a.setAttribute('data-ts',i.ts); row.appendChild(a);
+      var h=el('a','wr-hl',i.title); h.href=safeHref(i.link); h.target='_blank'; h.rel='noopener'; row.appendChild(h);
+      var m=el('div','wr-meta'); m.appendChild(el('span','',i.source));
+      if(i.breaking){var b=el('span','wr-badge','BREAKING'); b.style.color='var(--rd)'; m.appendChild(b);}
+      var col={bullish:'var(--gr)',bearish:'var(--rd)'}[i.sentiment];
+      if(col){var s=el('span','wr-badge',i.sentiment.toUpperCase()); s.style.color=col; m.appendChild(s);}
+      if(i.category){m.appendChild(el('span','',i.category));}
+      row.appendChild(m); list.appendChild(row);
+    });
+  }
+  function status(){
+    var n=items.length, chk=lastOk?Math.floor((Date.now()-lastOk)/1000):null;
+    stat.textContent=n+' stories \\u00b7 refreshes every 15s'+(chk===null?'':' \\u00b7 last check '+chk+'s ago');
+  }
+  function poll(){
+    fetch('/api/wire',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+      d.items.forEach(function(i){ if(!known[i.id]){known[i.id]=1; if(!firstLoad)newAt[i.id]=Date.now();} });
+      firstLoad=false; items=d.items; lastOk=Date.now(); render(); status();
+    }).catch(function(){});
+  }
+  document.querySelectorAll('.wr-tab').forEach(function(b){
+    b.addEventListener('click',function(){
+      onlyBrk=b.getAttribute('data-f')==='brk';
+      document.querySelectorAll('.wr-tab').forEach(function(x){x.classList.toggle('on',x===b);});
+      render();
+    });
+  });
+  setInterval(function(){
+    document.querySelectorAll('.wr-age').forEach(function(a){a.textContent=ago(+a.getAttribute('data-ts'));});
+    status();
+  },1000);
+  poll(); setInterval(poll,15000);
+})();
+</script>"""
 
 
 # ── Narrative Diffusion Map — how fast a theme spreads from first mention to full regional coverage ──
@@ -51104,15 +51314,31 @@ def render_page(page="main"):
 
 """
 
-    # New WIRE page shell — nav entry, icon, and route are wired up; actual
-    # content still needed from Rich (see reply). Placeholder only.
-    _B['wire'] = f"""    <div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">
-      <div class="about-body" style="text-align:center">
-        <img src="/logo.jpg?v={APP_VERSION}" alt="XRP Complete" style="height:56px;width:auto;margin:6px auto 18px;display:block">
-        <h1 style="margin-bottom:10px">Wire</h1>
-        <p style="color:var(--tx);font-size:15px">Page content coming soon.</p>
+    # V215: WIRE — live, auto-updating XRP news (fast-lane feeds + slow pool, newest first)
+    _wire_now = wire_snapshot()
+    _wire_rows = "".join(
+        f'<div class="wr-row{" wr-brk" if s.get("breaking") else ""}">'
+        f'<span class="wr-age" data-ts="{int(s["dt"].timestamp())}">{_time_ago(s["dt"])}</span>'
+        f'<a class="wr-hl" href="{html.escape(s["link"], quote=True)}" target="_blank" rel="noopener">{html.escape(s["title"])}</a>'
+        f'<div class="wr-meta"><span>{html.escape(s["source"])}</span>'
+        + ('<span class="wr-badge" style="color:var(--rd)">BREAKING</span>' if s.get("breaking") else '')
+        + '</div></div>'
+        for s in _wire_now
+    ) or '<div class="wr-empty">Connecting to feeds\u2026 new XRP headlines appear here the moment they are found.</div>'
+    _B['wire'] = f"""    {_WIRE_CSS}
+    <div class="acct" style="border-color:rgba(255,153,0,.4);margin:10px 0">
+      <div class="wr-head">
+        <div class="wr-title">WIRE</div>
+        <div class="wr-live"><span class="wr-dot"></span>LIVE</div>
       </div>
+      <div class="wr-stat" id="wr-stat">{len(_wire_now)} stories &middot; refreshes every 15s</div>
+      <div class="wr-tabs">
+        <button class="wr-tab on" data-f="all">ALL</button>
+        <button class="wr-tab" data-f="brk">BREAKING</button>
+      </div>
+      <div id="wr-list">{_wire_rows}</div>
     </div>
+    {_WIRE_JS}
 
 """
 
@@ -51970,6 +52196,16 @@ def page_wire():
     return Response(replace_flags_with_svg(render_page("wire")), mimetype="text/html")
 
 
+@app.route("/api/wire")
+def api_wire():
+    items = [wire_item_json(s) for s in wire_snapshot()]
+    upd = WIRE["updated"].timestamp() if WIRE["updated"] else None
+    body = jsonify({"updated": upd, "feeds_ok": WIRE["feeds_ok"], "feeds_total": WIRE["feeds_total"],
+                    "count": len(items), "items": items})
+    body.headers["Cache-Control"] = "no-store"
+    return body
+
+
 @app.route("/partnerships/export.json")
 def partnerships_export():
     pw = request.args.get("pw", "")
@@ -52244,6 +52480,7 @@ except Exception:
 threading.Thread(target=_bg_refresh, daemon=True).start()
 threading.Thread(target=_bg_news, daemon=True).start()
 threading.Thread(target=_bg_brief, daemon=True).start()
+threading.Thread(target=_bg_wire, daemon=True).start()
 
 
 if __name__ == "__main__":
