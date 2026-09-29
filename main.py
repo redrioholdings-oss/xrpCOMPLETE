@@ -50,6 +50,9 @@ V212-V215 changes (on the v188 base):
      embedded, switch back any time). ABOUT moved to the 2nd slot in the menu bar (Main, About, Markets,
      News, Institutional, Bridge, Regulatory, Community, Competition, Wire, Blog). Menu only -- no page
      content changed.
+  V224: the 12 cards in ABOUT "Site Navigation and Features" re-ordered to match the menu bar
+     (Main, About, Markets, News / Institutional, Bridge, Regulatory, Community / Competition, Wire,
+     Blog, Advanced). Each photo stays with its card. Nothing else changed.
 
 
 V185 changes:
@@ -305,7 +308,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "223"
+APP_VERSION = "224"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -34241,13 +34244,15 @@ NAV_FEATURE_ANCHORS = {
 }
 
 
-# (photo key, title, path, features). Order = 3 rows of 4. Blog is external.
+# (photo key, title, path, features). Order = 3 rows of 4, same as the menu bar (V224); Advanced last. Blog is external.
 NAV_CARDS = [
     ("main", "Main", "/", ["Status row", "XRP Global Liquidity Tracker", "On-Chain Intelligence",
         "XRP Ecosystem", "Mainstream Integration Monitor", "Institutional Partnership Tracker",
         "XRP \u00d7 Traditional Finance Timeline", "XRP Intelligence Brief", "World Briefing Clocks",
         "Competitive Briefing", "Regulatory Radar", "CLARITY Act Tracker", "New Partnerships &amp; Deals",
         "Advanced Metrics", "Regulatory &amp; Ledger Watch"]),
+    ("about", "About", "/about", ["About Red Rio Ventures, LLC", "Our Mission", "Our Patron Promise",
+        "What This Site Is / Is Not", "Contact"]),
     ("markets", "Markets", "/markets", ["Global Trading Hub Overlap", "RSI Signals", "52-Week Range",
         "Support &amp; Resistance", "Price Time Machine", "Live XRP/USD Chart", "Analytics Lab",
         "Longitudinal Value Markers", "Practical Tools", "Dollar Cost Averaging Calculator",
@@ -34269,8 +34274,6 @@ NAV_CARDS = [
         "The Flippening Meter", "Momentum Map", "Turnover Ratio", "What $100 Buys", "Market Cap Ladder",
         "XRP Scorecard"]),
     ("wire", "Wire", "/wire", ["Live newswire", "Feed health indicator"]),
-    ("about", "About", "/about", ["About Red Rio Ventures, LLC", "Our Mission", "Our Patron Promise",
-        "What This Site Is / Is Not", "Contact"]),
     ("blog", "Blog", "https://xrpcompleteblog.com", ["Our separate blog site. Opens in a new tab."]),
     ("advanced", "Advanced", "/advanced", ["Derivatives Snapshot", "30-Day Realized Volatility", "NVT Ratio",
         "Long/Short Ratio", "XRPL Network Health", "Escrow Countdown", "Order Book Spread",
