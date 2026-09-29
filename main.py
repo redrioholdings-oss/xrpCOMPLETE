@@ -39,6 +39,10 @@ V212-V215 changes (on the v188 base):
      (#008CFF) link title that turns Red Rio pink (#E0447C) on hover, and the page's features in
      white. Twelve photos embedded in main.py and served at /navcard/<name>.jpg. Hidden and
      utility routes are deliberately NOT listed. Nothing else changed.
+  V221: every feature link in the ABOUT page "Site Navigation and Features" cards now jumps straight to
+     that feature's section on its page (was: top of the page). Anchor ids (s-...) are added at render
+     time to the existing section blocks -- no page layout or content changed. Page titles and photos
+     still go to the top of the page.
 
 
 V185 changes:
@@ -294,7 +298,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "220"
+APP_VERSION = "221"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -30139,6 +30143,124 @@ NAVCARD_B64 = {
 }
 NAVCARD_BYTES = {k: base64.b64decode(v) for k, v in NAVCARD_B64.items()}
 
+# V221: section anchors. Block ids are injected into the first <div> of a section block at render
+# time (no wrapper elements, so layout is untouched). Sub-panel ids are injected by title text.
+NAV_BLOCK_IDS = {
+    "status": "s-status", "liquidity": "s-liquidity", "onchain": "s-onchain", "ecosystemgrid": "s-ecosystem",
+    "mainstream": "s-mainstream", "instpart": "s-instpart", "tradfi": "s-tradfi", "clocks": "s-clocks",
+    "competitive": "s-competitive", "clarity": "s-clarity", "advmetrics": "s-advmetrics",
+    "tradinghub": "s-tradinghub", "chart": "s-chart", "analytics": "s-analytics",
+    "longitudinal": "s-longitudinal", "practical": "s-practical", "dca": "s-dca", "hist30": "s-hist30",
+    "top10": "s-top10", "top20": "s-top20", "usintel": "s-usintel", "regdisc": "s-regdisc",
+    "heatmap": "s-heatmap", "nmv": "s-nmv", "newsfeed": "s-newsfeed", "sentiment": "s-sentiment",
+    "propfeed": "s-propfeed", "enterprise": "s-bridgeteaser", "exclusive": "s-exclusive",
+    "ecosystemchart": "s-ecochart", "bridgearchive": "s-bridgearchive", "scoreboard": "s-scoreboard",
+    "leaderboard": "s-leaderboard", "unique": "s-unique", "community": "s-hub", "memes": "s-memes",
+    "cmpshare": "s-cmpshare", "cmpnews": "s-cmpnews", "cmptokens": "s-cmptokens", "cmprace": "s-cmprace",
+    "cmpath": "s-cmpath", "cmpvol": "s-cmpvol", "cmpflip": "s-cmpflip", "cmpmomentum": "s-cmpmomentum",
+    "cmpturnover": "s-cmpturnover", "cmphundred": "s-cmphundred", "cmpladder": "s-cmpladder",
+    "cmpscore": "s-cmpscore", "wire": "s-wire",
+}
+# (title-class text, id) -- sub-panels that live inside a bigger block
+NAV_TITLE_IDS = [
+    ("RSI Signals", "s-rsi"), ("52-Week Range", "s-52wk"), ("Support &amp; Resistance", "s-supres"),
+    ("Price Time Machine", "s-timemachine"),
+    ("Ripple Exec Tracker", "s-exec"), ("XRPL Dev Activity", "s-xrpldev"),
+    ("Global Regulatory Status Map", "s-regmap"), ("ETF &amp; Product Approval Board", "s-etfboard"),
+    ("Enforcement &amp; Litigation Docket", "s-docket"), ("Rulemaking &amp; Legislative Calendar", "s-regcal"),
+    ("Regulator Voice Tracker", "s-voices"), ("Stablecoin Regulatory Overlay", "s-stable"),
+    ("Derivatives Snapshot", "s-deriv"), ("30-Day Realized Volatility", "s-realvol"),
+    ("NVT Ratio", "s-nvt"), ("Long/Short Ratio", "s-longshort"),
+    ("XRPL Network Health", "s-xrplhealth"), ("Escrow Countdown", "s-escrow"),
+    ("Order Book Spread", "s-obspread"), ("XRPL DEX Spread", "s-dexspread"),
+]
+NAV_H2_IDS = [
+    ("About Red Rio Ventures, LLC", "s-aboutrr"), ("Our Mission", "s-mission"),
+    ("Our Patron Promise", "s-promise"), ("What This Site Is", "s-siteis"), ("Contact", "s-contact"),
+]
+
+
+def _nav_inject_block_id(html, id_):
+    m = re.search(r'<div\b[^>]*>', html)
+    if not m or ' id=' in m.group(0):
+        return html
+    return html[:m.end() - 1] + ' id="' + id_ + '"' + html[m.end() - 1:]
+
+
+def _nav_inject_title_id(html, text, id_):
+    pat = re.compile(r'(<(?P<t>div|span) class="(?:sec-title|am-title|ed-title)")([^>]*>(?:(?!</(?P=t)>).)*?(?<![A-Za-z0-9])'
+                     + re.escape(text) + r'(?![A-Za-z0-9]))', re.S)
+    return pat.sub(lambda m: m.group(1) + ' id="' + id_ + '"' + m.group(3), html, count=1)
+
+
+def apply_nav_anchors(blocks):
+    """blocks: dict of section html (the _B dict). Returns nothing; edits in place."""
+    for key, id_ in NAV_BLOCK_IDS.items():
+        if key in blocks:
+            blocks[key] = _nav_inject_block_id(blocks[key], id_)
+
+
+def apply_nav_title_anchors(body):
+    for text, id_ in NAV_TITLE_IDS:
+        body = _nav_inject_title_id(body, text, id_)
+    for text, id_ in NAV_H2_IDS:
+        body = body.replace('<h2>' + text + '</h2>', '<h2 id="' + id_ + '">' + text + '</h2>', 1)
+    return body
+
+
+# (page title, feature text) -> anchor id on that page
+NAV_FEATURE_ANCHORS = {
+    ("Main", "Status row"): "s-status", ("Main", "XRP Global Liquidity Tracker"): "s-liquidity",
+    ("Main", "On-Chain Intelligence"): "s-onchain", ("Main", "XRP Ecosystem"): "s-ecosystem",
+    ("Main", "Mainstream Integration Monitor"): "s-mainstream",
+    ("Main", "Institutional Partnership Tracker"): "s-instpart",
+    ("Main", "XRP \u00d7 Traditional Finance Timeline"): "s-tradfi", ("Main", "XRP Intelligence Brief"): "brief",
+    ("Main", "World Briefing Clocks"): "s-clocks", ("Main", "Competitive Briefing"): "s-competitive",
+    ("Main", "Regulatory Radar"): "regradar", ("Main", "CLARITY Act Tracker"): "s-clarity",
+    ("Main", "New Partnerships &amp; Deals"): "newdeals", ("Main", "Advanced Metrics"): "s-advmetrics",
+    ("Main", "Regulatory &amp; Ledger Watch"): "regledger",
+    ("Markets", "Global Trading Hub Overlap"): "s-tradinghub", ("Markets", "RSI Signals"): "s-rsi",
+    ("Markets", "52-Week Range"): "s-52wk", ("Markets", "Support &amp; Resistance"): "s-supres",
+    ("Markets", "Price Time Machine"): "s-timemachine", ("Markets", "Live XRP/USD Chart"): "s-chart",
+    ("Markets", "Analytics Lab"): "s-analytics", ("Markets", "Longitudinal Value Markers"): "s-longitudinal",
+    ("Markets", "Practical Tools"): "s-practical", ("Markets", "Dollar Cost Averaging Calculator"): "s-dca",
+    ("Markets", "30-Day Historical Price Data"): "s-hist30", ("Markets", "Top 10 Cryptocurrencies"): "s-top10",
+    ("News", "Top 20 XRP Stories"): "s-top20", ("News", "US Intelligence + Global Pulse"): "s-usintel",
+    ("News", "Regional Discourse"): "s-regdisc", ("News", "Regional News Activity Heatmap"): "s-heatmap",
+    ("News", "News Mention Volume"): "s-nmv", ("News", "Global News Feed &amp; Search"): "s-newsfeed",
+    ("News", "Sentiment Engine"): "s-sentiment",
+    ("Institutional", "Proprietary &amp; Official Sources"): "s-propfeed",
+    ("Institutional", "Global Partnership Bridge teaser"): "s-bridgeteaser",
+    ("Institutional", "Ripple Exec Tracker"): "s-exec", ("Institutional", "XRPL Dev Activity"): "s-xrpldev",
+    ("Institutional", "XRP Complete Exclusive Intelligence"): "s-exclusive",
+    ("Bridge", "XRP Ecosystem chart"): "s-ecochart",
+    ("Bridge", "Global Partnership Bridge full archive"): "s-bridgearchive",
+    ("Regulatory", "Global Regulatory Status Map"): "s-regmap",
+    ("Regulatory", "ETF &amp; Product Approval Board"): "s-etfboard",
+    ("Regulatory", "Enforcement &amp; Litigation Docket"): "s-docket",
+    ("Regulatory", "Rulemaking &amp; Legislative Calendar"): "s-regcal",
+    ("Regulatory", "Regulator Voice Tracker"): "s-voices",
+    ("Regulatory", "Stablecoin Regulatory Overlay"): "s-stable",
+    ("Community", "Signal Scoreboard"): "s-scoreboard", ("Community", "XRP Complete Leaderboard"): "s-leaderboard",
+    ("Community", "Unique Displays"): "s-unique", ("Community", "XRP Community Hub"): "s-hub",
+    ("Community", "XRP Meme Wall"): "s-memes",
+    ("Competition", "Market Share"): "s-cmpshare", ("Competition", "Competitive News"): "s-cmpnews",
+    ("Competition", "Available Tokens"): "s-cmptokens", ("Competition", "24-Hour Performance Race"): "s-cmprace",
+    ("Competition", "Distance From All-Time High"): "s-cmpath", ("Competition", "24h Volume Share"): "s-cmpvol",
+    ("Competition", "The Flippening Meter"): "s-cmpflip", ("Competition", "Momentum Map"): "s-cmpmomentum",
+    ("Competition", "Turnover Ratio"): "s-cmpturnover", ("Competition", "What $100 Buys"): "s-cmphundred",
+    ("Competition", "Market Cap Ladder"): "s-cmpladder", ("Competition", "XRP Scorecard"): "s-cmpscore",
+    ("Wire", "Live newswire"): "s-wire", ("Wire", "Feed health indicator"): "wr-health",
+    ("About", "About Red Rio Ventures, LLC"): "s-aboutrr", ("About", "Our Mission"): "s-mission",
+    ("About", "Our Patron Promise"): "s-promise", ("About", "What This Site Is / Is Not"): "s-siteis",
+    ("About", "Contact"): "s-contact",
+    ("Advanced", "Derivatives Snapshot"): "s-deriv", ("Advanced", "30-Day Realized Volatility"): "s-realvol",
+    ("Advanced", "NVT Ratio"): "s-nvt", ("Advanced", "Long/Short Ratio"): "s-longshort",
+    ("Advanced", "XRPL Network Health"): "s-xrplhealth", ("Advanced", "Escrow Countdown"): "s-escrow",
+    ("Advanced", "Order Book Spread"): "s-obspread", ("Advanced", "XRPL DEX Spread"): "s-dexspread",
+}
+
+
 # (photo key, title, path, features). Order = 3 rows of 4. Blog is external.
 NAV_CARDS = [
     ("main", "Main", "/", ["Status row", "XRP Global Liquidity Tracker", "On-Chain Intelligence",
@@ -30186,7 +30308,7 @@ def about_nav_section_html():
         if ext:
             lis = "".join('<li>' + f + '</li>' for f in feats)
         else:
-            lis = "".join('<li><a href="' + path + '">' + f + '</a></li>' for f in feats)
+            lis = "".join('<li><a href="' + path + ('#' + NAV_FEATURE_ANCHORS[(title, f)] if (title, f) in NAV_FEATURE_ANCHORS else '') + '">' + f + '</a></li>' for f in feats)
         cards.append(
             '<div class="nvc">'
             '<a class="nvc-ph" href="' + path + '"' + tgt + ' aria-label="' + title + '">'
@@ -58229,6 +58351,7 @@ def render_page(page="main"):
   .nvc-l li{{ padding:3px 0; font-size:13.5px; line-height:1.35; color:#fff; }}
   .nvc-l a{{ color:#fff; text-decoration:none; }}
   .nvc-ph:focus-visible, .nvc-t:focus-visible, .nvc-l a:focus-visible{{ outline:2px solid #008CFF; outline-offset:2px; }}
+  [id^="s-"], #brief, #newdeals, #regradar, #regledger, #wr-health{{ scroll-margin-top:calc(var(--navh, 210px) + 14px); }}
   .about-body a{{ color:var(--hdr); }}
 
   /* V138: community meme wall */
@@ -60616,7 +60739,9 @@ def render_page(page="main"):
 
     _ORDER = {'main': ['status', 'liquidity', 'onchain', 'ecosystemgrid', 'mainstream', 'instpart', 'tradfi', 'brief', 'clocks', 'competitive', 'regradar', 'clarity', 'newdeals', 'advmetrics', 'regledger'], 'markets': ['tradinghub', 'rsi', 'chart', 'analytics', 'longitudinal', 'practical', 'dca', 'hist30', 'top10'], 'institutional': ['propfeed', 'enterprise', 'execdev', 'exclusive'], 'partnerships': ['ecosystemchart', 'bridgearchive'], 'wire': ['wire'], 'news': ['newsnav', 'top20', 'usintel', 'regdisc', 'heatmap', 'nmv', 'newsfeed', 'sentiment'], 'community': ['scoreboard', 'leaderboard', 'unique', 'community', 'memes'], 'about': ['about'], 'ecosystem': ['ecosystem'], 'regulatory': ['regnav', 'regnew'], 'competition': ['cmpshare', 'cmpnews', 'cmptokens', 'cmprace', 'cmpath', 'cmpvol', 'cmpflip', 'cmpmomentum', 'cmpturnover', 'cmphundred', 'cmpladder', 'cmpscore'], 'advanced': ['advanced']}
 
+    apply_nav_anchors(_B)
     _body = "".join(_B[k] for k in _ORDER.get(page, _ORDER["main"]))
+    _body = apply_nav_title_anchors(_body)
 
     _tail = f"""    
 
@@ -61115,6 +61240,22 @@ document.addEventListener('DOMContentLoaded', function() {{
       toggle();
       setTimeout(toggle, 400);   // safety re-check after late layout shifts (widgets, images loading)
       setInterval(toggle, 2000); // low-frequency safety net in case a scroll event is ever missed
+    }})();
+  </script>
+
+  <script>
+    /* V221: keep jumped-to sections clear of the sticky menu bar (its height changes with screen width) */
+    (function () {{
+      function setVar() {{ var n = document.querySelector('.xnav'); document.documentElement.style.setProperty('--navh', (n ? n.offsetHeight : 0) + 'px'); }}
+      function jump() {{
+        if (!location.hash) return;
+        var el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (el) el.scrollIntoView();
+      }}
+      setVar();
+      window.addEventListener('resize', setVar);
+      window.addEventListener('load', function () {{ setVar(); jump(); }});
+      window.addEventListener('hashchange', function () {{ setVar(); jump(); }});
     }})();
   </script>
 
