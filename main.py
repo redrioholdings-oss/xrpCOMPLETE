@@ -34,7 +34,7 @@ V212-V215 changes (on the v188 base):
      who prefer reduced motion), same height as the two stacked buttons; wraps under them on narrow
      screens. The header is shared, so it shows on every page. Blog site header not touched.
   V218: NEWSWIRE header button recolored to white lines (border + text) instead of amber.
-  V219: ABOUT page gains a new "Site Navigation and Features" section ABOVE "About Us": 3 rows of 4
+  V220: ABOUT page gains a new "Site Navigation and Features" section ABOVE "About Us": 3 rows of 4
      equal vertical cards (one per nav page, plus Blog and Advanced), each with a photo, a blue
      (#008CFF) link title that turns Red Rio pink (#E0447C) on hover, and the page's features in
      white. Twelve photos embedded in main.py and served at /navcard/<name>.jpg. Hidden and
@@ -294,7 +294,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "219"
+APP_VERSION = "220"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -21488,7 +21488,7 @@ ECOSYSTEM_B64 = (
 ECOSYSTEM_BYTES = base64.b64decode(ECOSYSTEM_B64)
 
 # ─────────────────────────────────────────────────────────────────────
-# V219: ABOUT PAGE — "SITE NAVIGATION AND FEATURES" (photos + card builder)
+# V220: ABOUT PAGE — "SITE NAVIGATION AND FEATURES" (photos + card builder)
 # ─────────────────────────────────────────────────────────────────────
 NAVCARD_B64 = {
     "main": (
@@ -30177,7 +30177,7 @@ NAV_CARDS = [
 
 
 def about_nav_section_html():
-    """V219: the 'Site Navigation and Features' section shown above 'About Us'.
+    """V220: the 'Site Navigation and Features' section shown above 'About Us'.
     Plain (non-f) string building so CSS/HTML braces never collide with the page f-strings."""
     cards = []
     for key, title, path, feats in NAV_CARDS:
@@ -58216,7 +58216,7 @@ def render_page(page="main"):
   .about-body .contact-box{{ background:var(--s2); border:1px solid var(--b); border-radius:9px; padding:14px 16px; margin:10px 0; }}
   .about-body .fine-print{{ font-size:12.5px; color:var(--tx); margin-top:26px; padding-top:16px; border-top:1px solid var(--b); line-height:1.65; }}
   .about-body ul{{ color:var(--br); font-size:15px; line-height:1.75; }}
-  /* V219: Site Navigation and Features cards */
+  /* V220: Site Navigation and Features cards */
   .nvc-grid{{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; align-items:stretch; }}
   @media (max-width:760px){{ .nvc-grid{{ grid-template-columns:repeat(2,minmax(0,1fr)); }} }}
   .nvc{{ background:#000; border:2px solid #008CFF; border-radius:18px; padding:10px; display:flex; flex-direction:column; min-width:0; }}
@@ -61229,7 +61229,7 @@ def meme_png(mid):
 
 @app.route("/navcard/<key>.jpg")
 def navcard_jpg(key):
-    """V219: photos for the About page 'Site Navigation and Features' cards."""
+    """V220: photos for the About page 'Site Navigation and Features' cards."""
     data = NAVCARD_BYTES.get(key)
     if data is None:
         abort(404)
