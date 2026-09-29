@@ -57,6 +57,10 @@ V212-V215 changes (on the v188 base):
      "bridge" (bridge/globe art), "desk" (night-desk photo) or "command" (this one); it is set to "command".
      The command photo is framed on its UPPER portion (helix and top of the room) -- the lower desk/chair
      area is cropped off on wide screens. All three images stay embedded; switching is one word.
+  V226: header buttons -- the white NEWSWIRE button is now a square (was wide); a new corporate-orange
+     (#CC5F00, brand Dark Orange) square "ABOUT SITE" button sits to its right and links to /about; the
+     italic tagline in the ABOUT page "Site Navigation and Features" section is corporate orange instead
+     of yellow (that section only -- other yellow taglines on the site are unchanged).
 
 
 V185 changes:
@@ -312,7 +316,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "225"
+APP_VERSION = "226"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -44494,7 +44498,7 @@ def about_nav_section_html():
     return (
         '<div class="acct" style="border-color:rgba(3,177,252,.35);margin:10px 0">'
         '<div class="sec-title" style="color:var(--hdr)"><span class="sic">\U0001F9ED</span> Site Navigation and Features</div>'
-        '<div class="trk-tag">Every page on XRP Complete and what you will find on it. Tap a page or any feature to go there.</div>'
+        '<div class="trk-tag" style="color:#CC5F00">Every page on XRP Complete and what you will find on it. Tap a page or any feature to go there.</div>'
         '<div class="nvc-grid">' + "".join(cards) + '</div></div>'
     )
 
@@ -72877,15 +72881,22 @@ def render_page(page="main"):
   /* V217: "UP TO THE MINUTE NEWSWIRE" ad button, beside the BLOG/ADVANCED stack, links to /wire */
   .hero-ctarow{{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }}
   .hero-wirebtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
-                 width:170px; padding:8px 6px; box-sizing:border-box; text-align:center; text-decoration:none;
+                 width:var(--sq,84px); height:var(--sq,84px); padding:4px 3px; box-sizing:border-box; text-align:center; text-decoration:none;
                  color:#fff; border:1px solid #fff; border-radius:7px; font-weight:800;
                  letter-spacing:1.6px; line-height:1.25; animation:wbglow 2.6s ease-in-out infinite; }}
-  .hero-wirebtn span{{ font-size:11px; }}
-  .hero-wirebtn .wb-big{{ font-size:16px; letter-spacing:1.4px; margin-top:2px; }}
+  .hero-wirebtn span{{ font-size:9px; letter-spacing:1px; }}
+  .hero-wirebtn .wb-big{{ font-size:12px; letter-spacing:.6px; margin-top:2px; }}
+  /* V226: ABOUT SITE -- corporate orange square, twin of the NEWSWIRE square */
+  .hero-aboutbtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+                 width:var(--sq,84px); height:var(--sq,84px); padding:4px 3px; box-sizing:border-box; text-align:center;
+                 text-decoration:none; color:#CC5F00; border:1px solid #CC5F00; border-radius:7px;
+                 font-weight:800; font-size:15px; letter-spacing:1.6px; line-height:1.25; }}
+  .hero-aboutbtn:hover{{ background:rgba(204,95,0,.16); color:#e06a00; border-color:#e06a00; }}
+  .hero-aboutbtn:focus-visible{{ outline:2px solid #CC5F00; outline-offset:2px; }}
   .hero-wirebtn:hover{{ background:rgba(255,255,255,.12); }}
   @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,255,255,0); }} 50%{{ box-shadow:0 0 14px rgba(255,255,255,.4); }} }}
   @media(prefers-reduced-motion:reduce){{ .hero-wirebtn{{ animation:none; }} }}
-  @media(max-width:480px){{ .hero-wirebtn{{ width:216px; padding:12px 6px; }} }}
+  @media(max-width:480px){{ .hero-btnstack{{ flex-basis:100%; }} .hero-wirebtn, .hero-aboutbtn{{ width:104px; height:104px; }} }}
   /* V181: thin solid explainer bar under the nav, ADVANCED page only */
   .adv-bar{{ background:#E0447C; color:#1a0410; font-weight:800; font-size:13px;
             letter-spacing:.3px; text-align:center; padding:9px 16px; }}
@@ -73057,6 +73068,7 @@ def render_page(page="main"):
               <a class="hc-blog hero-blogbtn hero-advbtn" href="/advanced">ADVANCED <span class="cta-ar">&#8594;</span></a>
             </div>
             <a class="hero-wirebtn" href="/wire" aria-label="Up to the minute newswire"><span>UP TO THE</span><span>MINUTE</span><span class="wb-big">NEWSWIRE</span></a>
+            <a class="hero-aboutbtn" href="/about" aria-label="About this site"><span>ABOUT</span><span>SITE</span></a>
           </div>
         </div>
         <div class="hero-card">
