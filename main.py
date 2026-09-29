@@ -61,6 +61,9 @@ V212-V215 changes (on the v188 base):
      (#CC5F00, brand Dark Orange) square "ABOUT SITE" button sits to its right and links to /about; the
      italic tagline in the ABOUT page "Site Navigation and Features" section is corporate orange instead
      of yellow (that section only -- other yellow taglines on the site are unchanged).
+  V227: new square XRP-blue (#008CFF) "LIVE CANDLES" button, third square in the header button row (after
+     NEWSWIRE and ABOUT SITE). It links to the Live XRP/USD Chart (candlestick chart) on the Markets page:
+     /markets#s-chart.
 
 
 V185 changes:
@@ -316,7 +319,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "226"
+APP_VERSION = "227"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -72893,10 +72896,19 @@ def render_page(page="main"):
                  font-weight:800; font-size:15px; letter-spacing:1.6px; line-height:1.25; }}
   .hero-aboutbtn:hover{{ background:rgba(204,95,0,.16); color:#e06a00; border-color:#e06a00; }}
   .hero-aboutbtn:focus-visible{{ outline:2px solid #CC5F00; outline-offset:2px; }}
+  /* V227: LIVE CANDLES -- XRP-blue square, third in the row */
+  .hero-candlesbtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+                 width:var(--sq,84px); height:var(--sq,84px); padding:4px 3px; box-sizing:border-box; text-align:center;
+                 text-decoration:none; color:#008CFF; border:1px solid #008CFF; border-radius:7px;
+                 font-weight:800; font-size:15px; letter-spacing:1.4px; line-height:1.25; }}
+  .hero-candlesbtn span{{ display:block; }}
+  .hero-candlesbtn .cd-sm{{ font-size:12.5px; letter-spacing:1px; }}
+  .hero-candlesbtn:hover{{ background:rgba(0,140,255,.16); color:#1e9bff; border-color:#1e9bff; }}
+  .hero-candlesbtn:focus-visible{{ outline:2px solid #008CFF; outline-offset:2px; }}
   .hero-wirebtn:hover{{ background:rgba(255,255,255,.12); }}
   @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,255,255,0); }} 50%{{ box-shadow:0 0 14px rgba(255,255,255,.4); }} }}
   @media(prefers-reduced-motion:reduce){{ .hero-wirebtn{{ animation:none; }} }}
-  @media(max-width:480px){{ .hero-btnstack{{ flex-basis:100%; }} .hero-wirebtn, .hero-aboutbtn{{ width:104px; height:104px; }} }}
+  @media(max-width:480px){{ .hero-btnstack{{ flex-basis:100%; }} .hero-wirebtn, .hero-aboutbtn, .hero-candlesbtn{{ width:104px; height:104px; }} }}
   /* V181: thin solid explainer bar under the nav, ADVANCED page only */
   .adv-bar{{ background:#E0447C; color:#1a0410; font-weight:800; font-size:13px;
             letter-spacing:.3px; text-align:center; padding:9px 16px; }}
@@ -73069,6 +73081,7 @@ def render_page(page="main"):
             </div>
             <a class="hero-wirebtn" href="/wire" aria-label="Up to the minute newswire"><span>UP TO THE</span><span>MINUTE</span><span class="wb-big">NEWSWIRE</span></a>
             <a class="hero-aboutbtn" href="/about" aria-label="About this site"><span>ABOUT</span><span>SITE</span></a>
+            <a class="hero-candlesbtn" href="/markets#s-chart" aria-label="Live candles chart"><span>LIVE</span><span class="cd-sm">CANDLES</span></a>
           </div>
         </div>
         <div class="hero-card">
