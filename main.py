@@ -64,6 +64,11 @@ V212-V215 changes (on the v188 base):
   V227: new square XRP-blue (#008CFF) "LIVE CANDLES" button, third square in the header button row (after
      NEWSWIRE and ABOUT SITE). It links to the Live XRP/USD Chart (candlestick chart) on the Markets page:
      /markets#s-chart.
+  V228: WIRE's three fast-lane background loops (news/press every 30s, XRPL on-chain every 4s, SEC
+     every 60s) slowed to every 5 minutes each, at Rich's request to cut Railway costs. Nothing else
+     touched -- the site's original 5-minute NEWS_FEEDS engine was already 5 minutes and is untouched;
+     the WIRE page's own frontend still polls /api/wire every 15s (that's a request to this same app,
+     not an external feed, so it costs nothing extra) -- flag if that should slow down too.
 
 
 V185 changes:
@@ -319,7 +324,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "227"
+APP_VERSION = "228"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -46039,7 +46044,7 @@ WIRE_FAST_FEEDS = [(n, u) for n, u in NEWS_FEEDS if "news.google.com" not in u] 
     ("GN Live: XRPL 1h",      _GN.format(q="XRPL+OR+%22XRP+Ledger%22+when:1h")),
     ("GN Live: XRP 6h",       _GN.format(q="XRP+when:6h")),
 ] + _PRESS_FEEDS
-WIRE_POLL_SECONDS = 30
+WIRE_POLL_SECONDS = 300   # V228: was 30s -- slowed to 5 min to cut Railway costs
 WIRE_KEEP_HOURS = 48
 WIRE_MAX_ITEMS = 400
 WIRE_ITEMS = {}          # key -> item dict (rolling store)
@@ -46223,7 +46228,7 @@ def _bg_chain():
             h = WIRE_HEALTH["chain"]
             h["errors"] += 1
             h["last_error"] = str(ex)[:80]
-        time.sleep(4)
+        time.sleep(300)   # V228: was 4s -- slowed to 5 min to cut Railway costs
 
 # ── lane 4: SEC EDGAR latest filings ──
 SEC_URL = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=&company=&dateb="
@@ -46266,7 +46271,7 @@ def _bg_sec():
             fetch_sec()
         except Exception:
             WIRE_HEALTH["sec"]["status"] = "error"
-        time.sleep(60)
+        time.sleep(300)   # V228: was 60s -- slowed to 5 min to cut Railway costs
 
 def wire_snapshot(limit=150, max_age_hours=36):
     """Fast-lane store UNION the slow pool, newest first, de-duplicated."""
