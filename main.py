@@ -69,6 +69,11 @@ V212-V215 changes (on the v188 base):
      touched -- the site's original 5-minute NEWS_FEEDS engine was already 5 minutes and is untouched;
      the WIRE page's own frontend still polls /api/wire every 15s (that's a request to this same app,
      not an external feed, so it costs nothing extra) -- flag if that should slow down too.
+  V229: fixed WIRE page text/behavior left at the old cadence after V228 -- the page still said
+     "refreshes every 15s" and its browser-side poll still checked /api/wire every 15s, even though
+     V228 slowed the actual data fetching to 5 min. Both the displayed text and the poll interval
+     (15000ms -> 300000ms) now match the 5-minute cadence. The 1s "Xs ago" age ticker is unchanged
+     (client-side only, no network call, not a cost driver).
 
 
 V185 changes:
@@ -324,7 +329,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "228"
+APP_VERSION = "229"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -46376,7 +46381,7 @@ _WIRE_JS = """<script>
   function fmtAge(s){return s==null?'n/a':(s<60?s+'s':Math.floor(s/60)+'m')+' ago';}
   function status(){
     var chk=lastOk?Math.floor((Date.now()-lastOk)/1000):null;
-    stat.textContent=items.length+' stories \\u00b7 refreshes every 15s'+(chk===null?'':' \\u00b7 last check '+chk+'s ago');
+    stat.textContent=items.length+' stories \\u00b7 refreshes every 5 min'+(chk===null?'':' \\u00b7 last check '+chk+'s ago');
     if(!health||!hl)return;
     hl.textContent='';
     function part(label,txt,ok){var s=el('span','');var b=el('b','',label+' '); b.style.color=ok?'var(--gr)':'var(--rd)'; s.appendChild(b); s.appendChild(document.createTextNode(txt+'   ')); hl.appendChild(s);}
@@ -46402,7 +46407,7 @@ _WIRE_JS = """<script>
     document.querySelectorAll('.wr-age').forEach(function(a){a.textContent=ago(+a.getAttribute('data-ts'));});
     status();
   },1000);
-  poll(); setInterval(poll,15000);
+  poll(); setInterval(poll,300000);   // V229: was 15000 (15s) -- matched to the 5-min fetch cadence
 })();
 </script>"""
 
@@ -74619,7 +74624,7 @@ def render_page(page="main"):
         <div class="wr-title">WIRE</div>
         <div class="wr-live"><span class="wr-dot"></span>LIVE</div>
       </div>
-      <div class="wr-stat" id="wr-stat">{len(_wire_now)} stories &middot; refreshes every 15s</div>
+      <div class="wr-stat" id="wr-stat">{len(_wire_now)} stories &middot; refreshes every 5 min</div>
       <div class="wr-tabs">
         <button class="wr-tab on" data-f="all">ALL</button>
         <button class="wr-tab" data-f="brk">BREAKING</button>
