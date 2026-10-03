@@ -74,6 +74,9 @@ V212-V215 changes (on the v188 base):
      V228 slowed the actual data fetching to 5 min. Both the displayed text and the poll interval
      (15000ms -> 300000ms) now match the 5-minute cadence. The 1s "Xs ago" age ticker is unchanged
      (client-side only, no network call, not a cost driver).
+  V230: LIVE CANDLES header button recolored from XRP-blue (#008CFF) to the site's existing green
+     (var(--gr), #48ff82 -- same green as the LIVE badge), at Rich's request. CSS only; size,
+     position, text, and link (/markets#s-chart) all unchanged.
 
 
 V185 changes:
@@ -329,7 +332,7 @@ from flask import Flask, Response, jsonify, abort, request
 # ─────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
-APP_VERSION = "229"
+APP_VERSION = "230"
 
 # LOGO (V120) - helix, recoloured to XRP blue #008CFF and sized to 375px
 # tall (three times what the header displays). Embedded here so the whole
@@ -72906,15 +72909,15 @@ def render_page(page="main"):
                  font-weight:800; font-size:15px; letter-spacing:1.6px; line-height:1.25; }}
   .hero-aboutbtn:hover{{ background:rgba(204,95,0,.16); color:#e06a00; border-color:#e06a00; }}
   .hero-aboutbtn:focus-visible{{ outline:2px solid #CC5F00; outline-offset:2px; }}
-  /* V227: LIVE CANDLES -- XRP-blue square, third in the row */
+  /* V230: LIVE CANDLES -- recolored green (was XRP-blue in V227) */
   .hero-candlesbtn{{ display:flex; flex-direction:column; align-items:center; justify-content:center;
                  width:var(--sq,84px); height:var(--sq,84px); padding:4px 3px; box-sizing:border-box; text-align:center;
-                 text-decoration:none; color:#008CFF; border:1px solid #008CFF; border-radius:7px;
+                 text-decoration:none; color:var(--gr); border:1px solid var(--gr); border-radius:7px;
                  font-weight:800; font-size:15px; letter-spacing:1.4px; line-height:1.25; }}
   .hero-candlesbtn span{{ display:block; }}
   .hero-candlesbtn .cd-sm{{ font-size:12.5px; letter-spacing:1px; }}
-  .hero-candlesbtn:hover{{ background:rgba(0,140,255,.16); color:#1e9bff; border-color:#1e9bff; }}
-  .hero-candlesbtn:focus-visible{{ outline:2px solid #008CFF; outline-offset:2px; }}
+  .hero-candlesbtn:hover{{ background:rgba(72,255,130,.16); color:var(--gr); border-color:var(--gr); }}
+  .hero-candlesbtn:focus-visible{{ outline:2px solid var(--gr); outline-offset:2px; }}
   .hero-wirebtn:hover{{ background:rgba(255,255,255,.12); }}
   @keyframes wbglow{{ 0%,100%{{ box-shadow:0 0 0 rgba(255,255,255,0); }} 50%{{ box-shadow:0 0 14px rgba(255,255,255,.4); }} }}
   @media(prefers-reduced-motion:reduce){{ .hero-wirebtn{{ animation:none; }} }}
